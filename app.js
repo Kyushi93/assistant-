@@ -144,7 +144,7 @@ function show(v) {
   document.querySelectorAll("#tabs button").forEach(t => t.classList.toggle("on", t.dataset.v === v));
   document.querySelectorAll(".view").forEach(x => x.classList.toggle("on", x.id === "v-" + v));
   try { history.replaceState(null, "", "#" + v); } catch (e) {}
-  window.scrollTo({ top: 0 });
+  $("scroller").scrollTo({ top: 0 });
 }
 $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) show(b.dataset.v); };
 { const h = location.hash.slice(1); if (["home", "agenda", "evals", "sante", "taches"].includes(h)) show(h); }
@@ -287,6 +287,8 @@ function card(i, big) {
 }
 
 let calView = "week"; let selD = TODAY();
+// Le week-end, l'agenda s'ouvre directement sur la semaine suivante
+if ([0, 6].includes(new Date().getDay())) selD = (() => { const d = new Date(); d.setDate(d.getDate() + (d.getDay() === 6 ? 2 : 1)); return iso(d); })();
 const addD = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
 const monday = s => { const d = parse(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return iso(d); };
 function renderCal() {
@@ -310,10 +312,11 @@ function renderCal() {
     h = `<div class="wgrid">`;
     for (let i = 0; i < 7; i++) {
       const s = addD(m, i); const it = dayItems(s); const x = parse(s);
-      if (i >= 5 && !it.length) continue;
+      if ((i >= 5 && !it.length) || (m === monday(TODAY()) && s < TODAY())) continue;
       h += `<div class="wday ${s === TODAY() ? "today" : ""}"><button class="wh" data-cd="${s}">${JOURS[x.getDay()]} <b>${x.getDate()}</b>${s === TODAY() ? ' <span class="pill p-teal">Auj.</span>' : ""}</button>
         ${it.length ? it.map(e => card(e)).join("") : `<div class="empty">Rien</div>`}</div>`;
     }
+    if (!h.includes("wday")) h += `<div class="empty" style="padding:24px 0;text-align:center">Plus rien cette semaine 🙌 Appuie sur → pour la suivante.</div>`;
     h += `</div>`;
   } else {
     title = JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()];
@@ -325,7 +328,7 @@ function renderCal() {
   $("ev-date").value = selD;
 }
 $("cal-views").onclick = e => { const b = e.target.closest("[data-cv]"); if (!b) return; calView = b.dataset.cv; renderCal(); };
-$("cal-body").onclick = e => { const c = e.target.closest("[data-cd]"); if (!c) return; selD = c.dataset.cd; calView = "day"; renderCal(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+$("cal-body").onclick = e => { const c = e.target.closest("[data-cd]"); if (!c) return; selD = c.dataset.cd; calView = "day"; renderCal(); $("scroller").scrollTo({ top: 0, behavior: "smooth" }); };
 $("prev").onclick = () => { const d = parse(selD); if (calView === "month") { d.setDate(1); d.setMonth(d.getMonth() - 1); selD = iso(d); } else selD = addD(selD, calView === "week" ? -7 : -1); renderCal(); };
 $("next").onclick = () => { const d = parse(selD); if (calView === "month") { d.setDate(1); d.setMonth(d.getMonth() + 1); selD = iso(d); } else selD = addD(selD, calView === "week" ? 7 : 1); renderCal(); };
 $("cal-today").onclick = () => { selD = TODAY(); renderCal(); };
