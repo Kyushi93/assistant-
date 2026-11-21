@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Assistant Thyvan</title>
 <meta name="theme-color" content="#16211F">
+<script>try{var t=localStorage.getItem("thy-theme")||"auto";document.documentElement.dataset.theme=(t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches))?"dark":"light"}catch(e){}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -204,6 +205,57 @@ nav.bottom{position:relative!important;flex:none;order:2}
 .card{min-width:0}
 .ecard .en,.tc .tn{overflow-wrap:anywhere}
 input[type=date],input[type=time]{min-width:0;-webkit-appearance:none;appearance:none;min-height:44px}
+/* v9 : stats, macros, mode sombre */
+.sg{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.minirings{display:grid;grid-template-columns:repeat(auto-fit,minmax(54px,1fr));gap:10px 2px;margin-top:16px;text-align:center}
+.minirings>div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--muted)}
+.minirings .na{width:52px;height:52px;border-radius:50%;border:7px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+svg .track{stroke:var(--line)} svg .rtxt{fill:var(--ink);font-family:Fraunces,serif;font-weight:700}
+.chart-svg{width:100%;height:150px;display:block;margin:8px 0 4px}
+.chart-svg .ctxt{font-size:10px;fill:var(--muted);font-family:Manrope,sans-serif;font-weight:700}
+.chart-svg .gline{stroke:var(--ink);stroke-dasharray:4 4;stroke-width:1.2;opacity:.45}
+.chart-svg .gtxt{fill:var(--ink);opacity:.6}
+.srow{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px solid var(--line)}
+.srow:last-child{border:none}
+.goal{display:grid;grid-template-columns:1fr 90px 64px;gap:8px;align-items:center;padding:6px 0;font-size:14px;font-weight:600}
+.goal input{text-align:right;padding:8px}.goal em{font-style:normal;color:var(--muted);font-size:12px}
+.macro{display:grid;gap:6px;margin-bottom:10px}
+.mrow{display:flex;justify-content:space-between;font-size:13px}
+.mrow3{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.fres{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-top:6px}
+.fres span{display:flex;flex-direction:column;min-width:0}.fres small{color:var(--muted);font-size:12px}
+.fres em{font-style:normal;text-align:right;font-weight:800;font-size:14px;white-space:nowrap}
+.fres:active{transform:scale(.99)}
+#theme-seg button{flex:1}
+nav.bottom button{min-width:0}
+@media(max-width:420px){nav.bottom button{font-size:10px}nav.bottom button i{font-size:19px}}
+/* Mode sombre */
+[data-theme=dark]{--bg:#0E1413;--card:#161F1D;--ink:#E7EEEA;--muted:#93A19B;--line:#28332F;--teal:#2DB3A3;--teal-soft:#123632;--coral-soft:#3A1F18;--gold-soft:#372C12;--blue-soft:#16264A;--violet-soft:#281E44;color-scheme:dark}
+[data-theme=dark] input,[data-theme=dark] select,[data-theme=dark] textarea{background:#1C2624;border-color:var(--line);color:var(--ink)}
+[data-theme=dark] .iconbtn,[data-theme=dark] .cd,[data-theme=dark] .mc,[data-theme=dark] .ecard,[data-theme=dark] .tc{background:var(--card);border-color:var(--line)}
+[data-theme=dark] .btn{background:#2A3633;color:#fff}
+[data-theme=dark] .btn.sec,[data-theme=dark] .seg button,[data-theme=dark] code{background:#222D2A;color:var(--ink)}
+[data-theme=dark] .btn.teal,[data-theme=dark] .seg button.on{background:var(--teal);color:#06110F}
+[data-theme=dark] .btn.coral{background:var(--coral);color:#fff}
+[data-theme=dark] .kpi>div,[data-theme=dark] .ev .d,[data-theme=dark] .gymweek div{background:#1C2624}
+[data-theme=dark] .gymweek div.on{background:var(--teal);color:#06110F}
+[data-theme=dark] .bar{background:#24302D}
+[data-theme=dark] .ring circle[stroke="#EEE8DE"]{stroke:#24302D}
+[data-theme=dark] nav.bottom{background:rgba(14,20,19,.96);border-color:var(--line)}
+[data-theme=dark] nav.bottom button.on{background:#1F2A27;color:var(--ink)}
+@media(min-width:900px){[data-theme=dark] nav.bottom{background:var(--bg)}[data-theme=dark] nav.bottom button.on{background:var(--ink);color:var(--bg)}}
+[data-theme=dark] .tg{background:#33403C}[data-theme=dark] .tg.on{background:var(--teal)}
+[data-theme=dark] .p-grey,[data-theme=dark] .t-autre{background:#26302D;color:#C5CFCA}
+[data-theme=dark] .p-gold{color:#F1C565}[data-theme=dark] .p-teal{color:#5FD1C2}[data-theme=dark] .p-blue{color:#8FB0FF}[data-theme=dark] .p-violet{color:#BFA4FF}[data-theme=dark] .p-coral{color:#FF9B7E}
+[data-theme=dark] .alert{color:var(--ink)}
+[data-theme=dark] .tc.next{background:#1B2422}
+[data-theme=dark] .ecard .ek,[data-theme=dark] .tc .tk{filter:brightness(1.6)}
+[data-theme=dark] .chk{border-color:#4A5753}
+[data-theme=dark] .stars button{color:#3A4643}[data-theme=dark] .stars button.on{color:var(--gold)}
+[data-theme=dark] .hero{background:linear-gradient(135deg,#132B27 0%,#0F3A33 100%)}
+[data-theme=dark] .sheet{background:rgba(0,0,0,.6)}
+[data-theme=dark] .toast{background:#E7EEEA;color:#0E1413}
+[data-theme=dark] .wday .wh{color:var(--ink)}[data-theme=dark] .wday.today .wh{color:var(--teal)}
 </style>
 </head>
 <body>
@@ -321,7 +373,7 @@ input[type=date],input[type=time]{min-width:0;-webkit-appearance:none;appearance
   <div class="grid g3">
     <div class="card">
       <h3>💧 Eau</h3>
-      <div class="kpi"><div><span class="lbl">Bu</span><b id="h-water">0 L</b></div><div><span class="lbl">Objectif</span><b>2,5 L</b></div></div>
+      <div class="kpi"><div><span class="lbl">Bu</span><b id="h-water">0 L</b></div><div><span class="lbl">Objectif</span><b id="h-goal">2,5 L</b></div></div>
       <div class="row" style="margin-top:10px"><button class="btn sec" data-hw="250">+25 cl</button><button class="btn sec" data-hw="500">+50 cl</button><button class="btn sec" data-hw="-250">−25 cl</button></div>
       <p class="small muted" style="margin-top:10px">≈ 35 ml/kg pour 70 kg. Ajoute ~0,5 L les jours de salle.</p>
     </div>
@@ -339,13 +391,15 @@ input[type=date],input[type=time]{min-width:0;-webkit-appearance:none;appearance
   </div>
   <div class="grid g2 mt">
     <div class="card">
-      <h3>🍽️ Repas</h3>
+      <h3>🍽️ Repas & macros</h3>
+      <div id="macro-tot" class="macro"></div>
       <div id="meals"></div>
-      <form id="meal-form" class="row nowrap" style="margin-top:10px">
-        <select id="meal-k" style="width:118px"><option>Petit-déj</option><option>Déjeuner</option><option>Collation</option><option>Dîner</option></select>
-        <input id="meal-d" placeholder="Ce que tu as mangé…" required>
-        <button class="btn teal">+</button>
+      <form id="meal-form" class="grid" style="gap:8px;margin-top:12px">
+        <div class="row nowrap"><select id="meal-k" style="width:120px"><option>Petit-déj</option><option>Déjeuner</option><option>Collation</option><option>Dîner</option></select><input id="meal-g" type="number" inputmode="numeric" min="1" value="150" style="width:90px" aria-label="Quantité en grammes"><span class="small muted">grammes</span></div>
+        <div class="row nowrap"><input id="meal-d" placeholder="Ex. riz, poulet grillé, 200g pâtes…" required autocomplete="off"><button class="btn teal" aria-label="Chercher">🔎</button></div>
       </form>
+      <div id="food-res"></div>
+      <p class="small muted" style="margin-top:8px">Valeurs nutritionnelles : table Ciqual (ANSES) et Open Food Facts.</p>
     </div>
     <div class="card">
       <h3>📈 7 derniers jours</h3>
@@ -355,6 +409,20 @@ input[type=date],input[type=time]{min-width:0;-webkit-appearance:none;appearance
       <div class="gymweek" style="margin-top:6px" id="gymweek"></div>
       <div class="kpi" style="margin-top:12px" id="week-kpi"></div>
     </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="view" id="v-stats">
+  <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:24px">📊 Mes stats</h2><div class="seg" id="stat-period"><button data-n="7" class="on">7 jours</button><button data-n="30">30 jours</button></div></div>
+  <div class="card" id="stat-global"></div>
+  <div class="grid g2 mt">
+    <div class="card" id="stat-water"></div>
+    <div class="card" id="stat-sleep"></div>
+    <div class="card" id="stat-sport"></div>
+    <div class="card" id="stat-food"></div>
+    <div class="card" id="stat-study"></div>
+    <div class="card" id="stat-goals"></div>
   </div>
 </section>
 
@@ -379,12 +447,18 @@ input[type=date],input[type=time]{min-width:0;-webkit-appearance:none;appearance
   <button data-v="agenda"><i>📅</i>Agenda</button>
   <button data-v="evals"><i>🎯</i>Évals</button>
   <button data-v="sante"><i>💪</i>Santé</button>
+  <button data-v="stats"><i>📊</i>Stats</button>
   <button data-v="taches"><i>✅</i>Tâches</button>
 </nav>
 
 <!-- REGLAGES -->
 <div class="sheet" id="settings"><div class="in">
   <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:22px">Réglages</h2><button class="btn sec" data-close>Fermer</button></div>
+
+  <div class="card">
+    <h3>🌗 Apparence</h3>
+    <div class="seg" id="theme-seg"><button data-theme-btn="auto">Auto (comme le téléphone)</button><button data-theme-btn="light">☀️ Clair</button><button data-theme-btn="dark">🌙 Sombre</button></div>
+  </div>
 
   <div class="card">
     <h3>☁️ Compte & synchro</h3>
