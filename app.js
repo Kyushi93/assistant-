@@ -1,7 +1,7 @@
 // Assistant Thyvan — application (données locales + synchro Supabase + notifications push)
 const CFG = window.APP_CONFIG || {};
 const HAS_CLOUD = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
-const GOAL = 2500;
+let GOAL = 2500;
 const LS = "thyvan-assistant-v1";
 
 /* ---------- Données fixes ---------- */
@@ -147,7 +147,7 @@ function show(v) {
   $("scroller").scrollTo({ top: 0 });
 }
 $("tabs").onclick = e => { const b = e.target.closest("button"); if (b) show(b.dataset.v); };
-{ const h = location.hash.slice(1); if (["home", "agenda", "evals", "sante", "taches"].includes(h)) show(h); }
+{ const h = location.hash.slice(1); if (["home", "agenda", "evals", "sante", "stats", "taches"].includes(h)) show(h); }
 $("open-settings").onclick = () => { renderNotif(); $("settings").classList.add("on"); };
 $("settings").onclick = e => { if (e.target.id === "settings" || e.target.closest("[data-close]")) $("settings").classList.remove("on"); };
 
@@ -405,7 +405,7 @@ function renderSante() {
   $("energy").onclick = e => { const b = e.target.closest("button"); if (!b) return; d.energy = +b.dataset.en; save(); renderSante(); };
   $("mood").innerHTML = MOODS.map(m => `<button data-m="${m}" class="${d.mood === m ? "on" : ""}" style="font-size:18px;padding:4px 8px">${m}</button>`).join("");
   $("mood").onclick = e => { const b = e.target.closest("button"); if (!b) return; d.mood = b.dataset.m; save(); renderSante(); };
-  $("meals").innerHTML = d.meals.length ? d.meals.map((m, i) => `<div class="meal"><span class="k">${esc(m.k)}</span><span>${esc(m.d)}</span><button class="x" data-delmeal="${i}">×</button></div>`).join("") : `<div class="empty">Aucun repas noté pour ce jour.</div>`;
+  renderMeals();
   renderWeek();
 }
 $("meal-form").onsubmit = e => { e.preventDefault(); const i = $("meal-d"); day(hDate()).meals.push({ k: $("meal-k").value, d: i.value.trim() }); i.value = ""; save(); renderSante(); };
@@ -498,7 +498,7 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferr
 $("install").onclick = async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; $("install").style.display = "none"; };
 
 /* ---------- Démarrage ---------- */
-function renderAll() { renderToday(); renderHome(); renderCal(); renderEvals(); renderSante(); renderTasks(); }
+function renderAll() { renderToday(); renderStats(); renderHome(); renderCal(); renderEvals(); renderSante(); renderTasks(); }
 seed(); try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {}
 renderAll();
 let lastDay = TODAY();
@@ -517,3 +517,144 @@ $("refresh").onclick = async () => {
   toast(user ? "À jour ✓" : "Actualisé · connecte-toi pour synchroniser");
 };
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadNews(); });
+
+/* ---------- v9 : objectifs, statistiques, macros, thème ---------- */
+var DEF_GOALS = { water: 2.5, sleep: 8, sport: 4, kcal: 2600, prot: 110 };
+function goals() { return Object.assign({ water: 2.5, sleep: 8, sport: 4, kcal: 2600, prot: 110 }, S.goals || {}); }
+function syncGoal() { GOAL = Math.round(goals().water * 1000); const w = document.querySelector(".ring .v .small"); if (w) w.textContent = "/ " + fmtL(GOAL); const hw = $("h-goal"); if (hw) hw.textContent = fmtL(GOAL); }
+
+/* Thème clair / sombre */
+function applyTheme() {
+  let t = "auto"; try { t = localStorage.getItem("thy-theme") || "auto"; } catch (e) {}
+  const dark = t === "dark" || (t === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = dark ? "#0E1413" : "#16211F";
+  document.querySelectorAll("[data-theme-btn]").forEach(b => b.classList.toggle("on", b.dataset.themeBtn === t));
+}
+document.querySelectorAll("[data-theme-btn]").forEach(b => b.onclick = () => { try { localStorage.setItem("thy-theme", b.dataset.themeBtn); } catch (e) {} applyTheme(); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+applyTheme();
+
+/* Base d'aliments (table Ciqual de l'ANSES) */
+var FOOD = null;
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/œ/g, "oe").replace(/[^a-z0-9 ]/g, " ");
+const ALIAS = { pates: "pates", spaghetti: "pates", spaghettis: "pates", coquillettes: "pates", steak: "boeuf steak", oeufs: "oeuf", frites: "frites", yaourt: "yaourt", whey: "proteine lactoserum" };
+async function loadFood() { if (FOOD) return FOOD; const r = await fetch("ciqual.json"); FOOD = (await r.json()).map(x => ({ n: x[0], k: x[1], p: x[2], c: x[3], f: x[4], g: x[5], s: " " + norm(x[0]) + " " })); return FOOD; }
+function parseQty(txt) { const m = txt.match(/(\d+(?:[.,]\d+)?)\s*(g|gr|grammes?|ml|cl|kg)\b/i); if (!m) return null; let v = parseFloat(m[1].replace(",", ".")); const u = m[2].toLowerCase(); if (u === "kg") v *= 1000; if (u === "cl") v *= 10; return { g: Math.round(v), rest: txt.replace(m[0], " ") }; }
+function searchFood(q) {
+  const toks = norm(q).split(/\s+/).filter(t => t.length > 1 && !["de", "du", "la", "le", "les", "au", "aux", "et", "avec", "des", "un", "une"].includes(t)).map(t => ALIAS[t] || t).join(" ").split(" ");
+  if (!toks.length || !FOOD) return [];
+  const wantRaw = /\bcru/.test(norm(q)), wantJuice = /jus|nectar|sauce|sirop/.test(norm(q));
+  return FOOD.map(it => {
+    let sc = 0, hit = 0;
+    toks.forEach((t, i) => { const sg = t.length > 3 ? t.replace(/s$/, "") : t; if (it.s.includes(" " + t + " ")) { sc += 13; hit++; if (it.s.startsWith(" " + t + " ")) sc += i === 0 ? 8 : 3; } else if (it.s.includes(" " + sg)) { sc += 9; hit++; if (it.s.startsWith(" " + sg)) sc += i === 0 ? 6 : 2; } else if (it.s.includes(sg)) { sc += 4; hit++; } });
+    if (hit < Math.max(1, Math.ceil(toks.length * 0.6))) return null;
+    if (/ cuit/.test(it.s) && !wantRaw) sc += 3;
+    if (/ cru/.test(it.s) && !wantRaw) sc -= 2;
+    if (!wantJuice && /^ (jus|nectar|sauce|sirop|arome|graisse|farine)/.test(it.s)) sc -= 8;
+    sc -= it.n.length / 25;
+    return { it, sc };
+  }).filter(Boolean).sort((a, b) => b.sc - a.sc).slice(0, 8).map(x => x.it);
+}
+async function searchOFF(q) {
+  const r = await fetch("https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&json=1&page_size=8&fields=product_name,brands,nutriments&search_terms=" + encodeURIComponent(q));
+  const j = await r.json();
+  return (j.products || []).filter(p => p.nutriments && p.nutriments["energy-kcal_100g"] != null && p.product_name).map(p => ({ n: p.product_name + (p.brands ? " (" + p.brands.split(",")[0] + ")" : ""), k: Math.round(p.nutriments["energy-kcal_100g"]), p: +(p.nutriments.proteins_100g || 0).toFixed(1), c: +(p.nutriments.carbohydrates_100g || 0).toFixed(1), f: +(p.nutriments.fat_100g || 0).toFixed(1), g: "Open Food Facts" }));
+}
+var foodRes = [];
+function showFoodRes(list, title) {
+  foodRes = list;
+  const g = +$("meal-g").value || 150;
+  $("food-res").innerHTML = list.length ? `<div class="lbl" style="margin:10px 0 4px">${title} · pour ${g} g</div>` + list.map((it, i) => `<button class="fres" data-fi="${i}"><span><b>${esc(it.n)}</b><small>${esc(it.g)} · ${it.k} kcal/100 g</small></span><em>${Math.round(it.k * g / 100)} kcal<br><small>P ${Math.round(it.p * g / 100)} · G ${Math.round(it.c * g / 100)} · L ${Math.round(it.f * g / 100)}</small></em></button>`).join("")
+    + `<div class="row" style="margin-top:8px"><button class="btn sec" id="food-off" type="button">🌐 Chercher un produit de marque</button><button class="btn sec" id="food-free" type="button">Ajouter sans macros</button></div>`
+    : `<div class="empty">Aucun aliment trouvé. Essaie un mot plus simple (ex. « riz », « poulet »).</div><div class="row"><button class="btn sec" id="food-off" type="button">🌐 Chercher un produit de marque</button><button class="btn sec" id="food-free" type="button">Ajouter sans macros</button></div>`;
+}
+$("meal-form").onsubmit = async e => {
+  e.preventDefault();
+  const raw = $("meal-d").value.trim(); if (!raw) return;
+  const q = parseQty(raw); if (q) $("meal-g").value = q.g;
+  $("food-res").innerHTML = `<div class="empty">Recherche…</div>`;
+  try { await loadFood(); showFoodRes(searchFood(q ? q.rest : raw), "Table Ciqual (ANSES)"); }
+  catch (err) { $("food-res").innerHTML = `<div class="empty">Base d'aliments indisponible hors-ligne.</div>`; }
+};
+$("food-res").addEventListener("click", async e => {
+  const b = e.target.closest("[data-fi]");
+  if (b) {
+    const it = foodRes[+b.dataset.fi]; const g = +$("meal-g").value || 150; const r = x => Math.round(x * g / 10) / 10;
+    day(hDate()).meals.push({ k: $("meal-k").value, d: it.n, g, kcal: Math.round(it.k * g / 100), p: r(it.p), c: r(it.c), f: r(it.f) });
+    $("meal-d").value = ""; $("food-res").innerHTML = ""; save(); renderSante(); toast("Repas ajouté ✓"); return;
+  }
+  if (e.target.id === "food-off") {
+    $("food-res").innerHTML = `<div class="empty">Recherche sur Open Food Facts…</div>`;
+    try { showFoodRes(await searchOFF(parseQty($("meal-d").value)?.rest || $("meal-d").value), "Open Food Facts"); } catch (err) { $("food-res").innerHTML = `<div class="empty">Pas de connexion à Open Food Facts.</div>`; }
+  }
+  if (e.target.id === "food-free") { day(hDate()).meals.push({ k: $("meal-k").value, d: $("meal-d").value.trim() }); $("meal-d").value = ""; $("food-res").innerHTML = ""; save(); renderSante(); }
+});
+$("meal-g").addEventListener("input", () => { if (foodRes.length) showFoodRes(foodRes, $("food-res").querySelector(".lbl")?.textContent.split(" · ")[0] || "Résultats"); });
+function dayMacros(d) { const t = { kcal: 0, p: 0, c: 0, f: 0, n: 0 }; (d.meals || []).forEach(m => { if (m.kcal != null) { t.kcal += m.kcal; t.p += m.p || 0; t.c += m.c || 0; t.f += m.f || 0; t.n++; } }); return t; }
+function renderMeals() {
+  const d = day(hDate()); const t = dayMacros(d); const G = goals();
+  $("meals").innerHTML = d.meals.length ? d.meals.map((m, i) => `<div class="meal"><span class="k">${esc(m.k)}</span><span style="flex:1">${esc(m.d)}${m.kcal != null ? `<br><small class="muted">${m.g} g · ${m.kcal} kcal · P ${m.p} · G ${m.c} · L ${m.f}</small>` : ""}</span><button class="x" data-delmeal="${i}">×</button></div>`).join("") : `<div class="empty">Aucun repas noté pour ce jour.</div>`;
+  const bar = (v, goal, col) => `<div class="bar"><i style="width:${Math.min(100, v / goal * 100)}%;background:${col}"></i></div>`;
+  $("macro-tot").innerHTML = `<div class="mrow"><span>🔥 Calories</span><b>${Math.round(t.kcal)} / ${G.kcal} kcal</b></div>${bar(t.kcal, G.kcal, "#E4572E")}
+    <div class="mrow"><span>🥩 Protéines</span><b>${Math.round(t.p)} / ${G.prot} g</b></div>${bar(t.p, G.prot, "#0F766E")}
+    <div class="mrow3"><span>🍚 Glucides <b>${Math.round(t.c)} g</b></span><span>🧈 Lipides <b>${Math.round(t.f)} g</b></span></div>`;
+}
+
+/* Statistiques */
+var statN = 7;
+const lastDays = n => Array.from({ length: n }, (_, i) => { const x = new Date(); x.setDate(x.getDate() - (n - 1 - i)); return iso(x); });
+function ringSvg(pct, col, size = 92, sw = 10) { const r = (size - sw) / 2, c = 2 * Math.PI * r; return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="track" stroke-width="${sw}" fill="none"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="${col}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - Math.min(1, pct / 100))}" transform="rotate(-90 ${size / 2} ${size / 2})"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" class="rtxt" font-size="${size / 4.2}">${Math.round(pct)}%</text></svg>`; }
+function barSvg(vals, labels, goal, col, fmt) {
+  const W = 320, H = 150, pb = 22, pt = 14, max = Math.max(goal || 0, ...vals, 0.0001) * 1.12, n = vals.length, bw = W / n;
+  const y = v => pt + (H - pb - pt) * (1 - v / max);
+  let s = `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" preserveAspectRatio="none">`;
+  vals.forEach((v, i) => { const x = i * bw + bw * 0.18, w = bw * 0.64, ok = goal && v >= goal; s += `<rect x="${x}" y="${y(v)}" width="${w}" height="${Math.max(0, H - pb - y(v))}" rx="${Math.min(6, w / 3)}" fill="${ok ? col : col}" opacity="${v ? (ok ? 1 : .55) : .15}"/>`; if (n <= 10 && v) s += `<text x="${x + w / 2}" y="${y(v) - 4}" text-anchor="middle" class="ctxt">${fmt(v)}</text>`; if (n <= 10 || i % Math.ceil(n / 8) === 0) s += `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle" class="ctxt">${labels[i]}</text>`; });
+  if (goal) s += `<line x1="0" x2="${W}" y1="${y(goal)}" y2="${y(goal)}" class="gline"/><text x="2" y="${Math.max(10, y(goal) - 3)}" text-anchor="start" class="ctxt gtxt">🎯 ${fmt(goal)}</text>`;
+  return s + `</svg>`;
+}
+function computeStats(n) {
+  const G = goals(), ds = lastDays(n), dd = ds.map(s => S.days[s] || {});
+  const water = dd.map(d => (d.water || 0) / 1000);
+  const sleep = dd.map(d => +d.sleep || 0);
+  const gymDays = dd.map(d => d.gym && d.gym !== "repos" ? 1 : 0);
+  const mac = dd.map(dayMacros);
+  const pW = water.reduce((a, v) => a + Math.min(1, v / G.water), 0) / n * 100;
+  const sl = sleep.filter(v => v > 0); const pS = sl.length ? sl.reduce((a, v) => a + Math.min(1, v / G.sleep), 0) / sl.length * 100 : null;
+  const sessions = gymDays.reduce((a, v) => a + v, 0); const pSp = Math.min(100, sessions / (G.sport * n / 7) * 100);
+  const md = mac.filter(m => m.n); const pN = md.length ? md.reduce((a, m) => a + 0.5 * Math.min(1, m.p / G.prot) + 0.5 * Math.max(0, 1 - Math.abs(m.kcal - G.kcal) / G.kcal), 0) / md.length * 100 : null;
+  const up = upcomingCC().filter(c => diffDays(c.date) <= 21); const pE = up.length ? up.reduce((a, c) => a + (S.rev[c.id] || 0), 0) / up.length : null;
+  const parts = [pW, pS, pSp, pN, pE].filter(v => v != null);
+  return { G, ds, water, sleep, gymDays, mac, pW, pS, pSp, pN, pE, sessions, sl, md, up, global: parts.reduce((a, v) => a + v, 0) / parts.length };
+}
+function renderStats() {
+  if (!window.__v9 || !$("v-stats")) return;
+  const st = computeStats(statN), G = st.G;
+  document.querySelectorAll("#stat-period button").forEach(b => b.classList.toggle("on", +b.dataset.n === statN));
+  const lab = st.ds.map(s => statN <= 7 ? JOURS[parse(s).getDay()].slice(0, 2) : parse(s).getDate() + "");
+  const comp = [["💧 Eau", st.pW, "#2563EB"], ["😴 Sommeil", st.pS, "#7C3AED"], ["🏋️ Sport", st.pSp, "#E4572E"], ["🍽️ Nutrition", st.pN, "#0F766E"], ["📚 Révisions", st.pE, "#C98B12"]];
+  const verdict = st.global >= 85 ? "Excellent, continue comme ça 🔥" : st.global >= 65 ? "Bonne période, encore un petit effort 💪" : st.global >= 40 ? "Correct, vise un domaine à la fois 🎯" : "On relance la machine : commence par l'eau et le sommeil 🌱";
+  $("stat-global").innerHTML = `<div class="sg">${ringSvg(st.global || 0, "var(--teal)", 132, 14)}<div><div class="lbl">Score global · ${statN} derniers jours</div><div style="font-family:Fraunces,serif;font-size:20px;margin-top:4px">${verdict}</div><div class="small muted" style="margin-top:4px">Moyenne de tes objectifs atteints</div></div></div>
+    <div class="minirings">${comp.map(([l, v, c]) => `<div>${v == null ? `<div class="na">—</div>` : ringSvg(v, c, 52, 6)}<span>${l}</span></div>`).join("")}</div>`;
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  $("stat-water").innerHTML = `<h3>💧 Eau</h3><div class="kpi"><div><span class="lbl">Moyenne</span><b>${fmtL(avg(st.water) * 1000)}</b></div><div><span class="lbl">Objectif atteint</span><b>${st.water.filter(v => v >= G.water).length}/${statN} j</b></div></div>${barSvg(st.water, lab, G.water, "#2563EB", v => v.toFixed(1))}`;
+  $("stat-sleep").innerHTML = `<h3>😴 Sommeil</h3><div class="kpi"><div><span class="lbl">Moyenne</span><b>${st.sl.length ? avg(st.sl).toFixed(1) + " h" : "—"}</b></div><div><span class="lbl">Nuits ≥ ${G.sleep} h</span><b>${st.sl.filter(v => v >= G.sleep).length}/${st.sl.length || 0}</b></div></div>${barSvg(st.sleep, lab, G.sleep, "#7C3AED", v => v.toFixed(1))}${st.sl.length ? "" : `<p class="small muted">Note ton sommeil chaque matin dans l'onglet Santé.</p>`}`;
+  const weeks = Array.from({ length: 8 }, (_, i) => { const m = parse(monday(TODAY())); m.setDate(m.getDate() - 7 * (7 - i)); const s = iso(m); let c = 0, min = 0; for (let k = 0; k < 7; k++) { const d = S.days[addD(s, k)]; if (d && d.gym && d.gym !== "repos") { c++; min += +d.dur || 0; } } return { s, c, min }; });
+  const types = {}; Object.values(S.days).forEach(d => { if (d.gym && d.gym !== "repos") types[d.gym] = (types[d.gym] || 0) + 1; });
+  $("stat-sport").innerHTML = `<h3>🏋️ Sport</h3><div class="kpi"><div><span class="lbl">Séances (${statN} j)</span><b>${st.sessions}</b></div><div><span class="lbl">Objectif</span><b>${G.sport}/sem.</b></div><div><span class="lbl">Cette semaine</span><b>${weeks[7].c}/${G.sport}</b></div></div>${barSvg(weeks.map(w => w.c), weeks.map(w => parse(w.s).getDate() + "/" + (parse(w.s).getMonth() + 1)), G.sport, "#E4572E", v => v)}
+    <div class="small muted">Séances par semaine (8 dernières).${Object.keys(types).length ? " Répartition : " + Object.entries(types).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") : ""}</div>`;
+  const kc = st.mac.map(m => m.kcal), pr = st.mac.map(m => Math.round(m.p));
+  $("stat-food").innerHTML = `<h3>🍽️ Nutrition</h3><div class="kpi"><div><span class="lbl">Calories moy.</span><b>${st.md.length ? Math.round(avg(st.md.map(m => m.kcal))) : "—"}</b></div><div><span class="lbl">Protéines moy.</span><b>${st.md.length ? Math.round(avg(st.md.map(m => m.p))) + " g" : "—"}</b></div></div>
+    <div class="lbl" style="margin-top:10px">Calories / jour</div>${barSvg(kc, lab, G.kcal, "#E4572E", v => Math.round(v))}<div class="lbl">Protéines / jour (g)</div>${barSvg(pr, lab, G.prot, "#0F766E", v => Math.round(v))}${st.md.length ? "" : `<p class="small muted">Ajoute tes repas avec la recherche d'aliments (onglet Santé) pour voir tes macros.</p>`}`;
+  const wk = monday(TODAY()); let hrs = 0; EDT.filter(r => r[0] >= wk && r[0] <= addD(wk, 6)).forEach(r => { const [a, b] = [r[1], r[2]].map(t => +t.slice(0, 2) + t.slice(3) / 60); hrs += b - a; });
+  const done7 = S.tasks.filter(t => t.done).length, todo = S.tasks.filter(t => !t.done).length;
+  $("stat-study").innerHTML = `<h3>📚 Études</h3><div class="kpi"><div><span class="lbl">Cours cette semaine</span><b>${Math.round(hrs)} h</b></div><div><span class="lbl">Tâches faites</span><b>${done7}/${done7 + todo}</b></div><div><span class="lbl">Révisions (3 sem.)</span><b>${st.pE == null ? "—" : Math.round(st.pE) + "%"}</b></div></div>
+    ${st.up.length ? st.up.map(c => `<div class="srow"><span><b>${c.ue}</b> ${esc(c.name)} <small class="muted">${jx(diffDays(c.date))}</small></span><div class="bar"><i style="width:${S.rev[c.id] || 0}%;background:${diffDays(c.date) <= 7 ? "#DC2626" : "var(--teal)"}"></i></div><b>${S.rev[c.id] || 0}%</b></div>`).join("") : `<div class="empty">Pas d'éval dans les 3 prochaines semaines.</div>`}`;
+  const gi = (k, label, unit, step) => `<label class="goal"><span>${label}</span><input type="number" inputmode="decimal" step="${step}" min="0" data-goal="${k}" value="${G[k]}"><em>${unit}</em></label>`;
+  $("stat-goals").innerHTML = `<h3>🎯 Mes objectifs</h3><p class="small muted" style="margin-bottom:8px">Ce sont les cibles qui servent à calculer tes pourcentages. Modifie-les quand tu veux.</p>
+    ${gi("water", "💧 Eau par jour", "L", "0.1")}${gi("sleep", "😴 Sommeil par nuit", "h", "0.5")}${gi("sport", "🏋️ Séances de sport", "/ semaine", "1")}${gi("kcal", "🔥 Calories par jour", "kcal", "50")}${gi("prot", "🥩 Protéines par jour", "g", "5")}
+    <p class="small muted" style="margin-top:8px">Repères : ~35 ml d'eau/kg, 7–9 h de sommeil, 1,6 g de protéines/kg si tu fais de la muscu. Les calories dépendent de ton activité : ajuste selon ta forme.</p>`;
+}
+$("stat-goals").addEventListener("change", e => { const i = e.target.closest("[data-goal]"); if (!i) return; const v = parseFloat(String(i.value).replace(",", ".")); if (!(v > 0)) return; S.goals = Object.assign({}, S.goals || {}, { [i.dataset.goal]: v }); save(); syncGoal(); renderAll(); toast("Objectif mis à jour 🎯"); });
+$("stat-period").onclick = e => { const b = e.target.closest("[data-n]"); if (!b) return; statN = +b.dataset.n; renderStats(); };
+window.__v9 = true; syncGoal(); renderAll();
