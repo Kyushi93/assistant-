@@ -199,7 +199,7 @@ function addWater(dt, v) { const d = day(dt); const before = d.water || 0; d.wat
 document.querySelectorAll("[data-w]").forEach(b => b.onclick = () => addWater(TODAY(), +b.dataset.w));
 document.querySelectorAll("[data-hw]").forEach(b => b.onclick = () => addWater(hDate(), +b.dataset.hw));
 
-const GYM = [["push", "Push"], ["pull", "Pull"], ["legs", "Legs"], ["full", "Full body"], ["cardio", "Cardio"], ["repos", "Repos"]];
+const GYM = [["push", "Push"], ["pull", "Pull"], ["legs", "Legs"], ["full", "Full body"], ["padel", "Padel 🎾"], ["cardio", "Cardio"], ["repos", "Repos"]];
 function renderGymSeg(id, dt) {
   const d = day(dt), el = $(id);
   el.innerHTML = GYM.map(([k, l]) => `<button data-g="${k}" class="${d.gym === k ? "on" : ""}">${l}</button>`).join("");
