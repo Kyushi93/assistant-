@@ -58,7 +58,7 @@ function setDot(state) { $("sync-dot").className = "d " + state; }
 function save() {
   S.updatedAt = Date.now();
   try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {}
-  if (user) { clearTimeout(pushT); pushT = setTimeout(pushRemote, 800); }
+  if (user) { clearTimeout(pushT); pushT = setTimeout(() => { pushT = null; pushRemote(); }, 800); }
 }
 async function pushRemote() {
   if (!user) return;
@@ -94,7 +94,7 @@ async function initCloud() {
     renderAcct();
     if (user) await pullRemote(); else setDot("off");
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pullRemote(); });
-    setInterval(() => { if (document.visibilityState === "visible") pullRemote(); }, 60000);
+    setInterval(() => { if (document.visibilityState === "visible" && !pushT) pullRemote(); }, 15000);
   } catch (e) { console.warn(e); setDot("warn"); renderAcct("Impossible de joindre le serveur (hors-ligne ?)."); }
 }
 function renderAcct(msg) {
@@ -417,4 +417,13 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then
 initCloud();
 function loadNews() { fetch("news.json?ts=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.json() : []).then(j => { NEWS = Array.isArray(j) ? j : (j.items || []); renderAll(); }).catch(() => {}); }
 loadNews();
+$("refresh").onclick = async () => {
+  const b = $("refresh"); b.classList.add("spin");
+  try {
+    if (user) { if (pushT) { clearTimeout(pushT); pushT = null; await pushRemote(); } await pullRemote(); }
+    loadNews(); if (swReg) swReg.update().catch(() => {});
+  } catch (e) { console.warn(e); }
+  renderAll(); setTimeout(() => b.classList.remove("spin"), 500);
+  toast(user ? "À jour ✓" : "Actualisé · connecte-toi pour synchroniser");
+};
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadNews(); });
