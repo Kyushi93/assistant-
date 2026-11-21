@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Assistant Thyvan</title>
+<meta name="theme-color" content="#16211F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Assistant">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F2EC;--card:#fff;--ink:#16211F;--muted:#6B746F;--line:#E5E0D6;
+  --teal:#0F766E;--teal-soft:#DDF0EC;--coral:#E4572E;--coral-soft:#FBE4DC;
+  --gold:#C98B12;--gold-soft:#FBF0D6;--blue:#2563EB;--blue-soft:#E0E9FD;
+  --violet:#7C3AED;--violet-soft:#EDE4FD;--r:18px;
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg)}
+body{font-family:Manrope,system-ui,sans-serif;color:var(--ink);font-size:15px;line-height:1.45;padding-bottom:calc(86px + var(--sb))}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:700;letter-spacing:-.01em}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font:inherit;font-size:16px;color:inherit;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:-1px;border-color:transparent}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header.top{padding-top:calc(18px + var(--st));padding-bottom:8px}
+.toprow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hello{font-size:26px}.hello span{color:var(--teal)}
+.sub{color:var(--muted);font-size:13px}
+.iconbtn{width:42px;height:42px;border-radius:50%;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:19px;position:relative;flex:none}
+.iconbtn .d{position:absolute;right:2px;top:2px;width:10px;height:10px;border-radius:50%;border:2px solid #fff;background:#bbb}
+.d.ok{background:#16a34a!important}.d.warn{background:var(--gold)!important}.d.off{background:#bbb}
+/* nav : barre du bas (mobile) / onglets (ordi) */
+nav.bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 6px calc(6px + var(--sb));display:flex;justify-content:space-around}
+nav.bottom button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:12px;font-size:11px;font-weight:700;color:var(--muted)}
+nav.bottom button i{font-style:normal;font-size:21px;line-height:1}
+nav.bottom button.on{color:var(--ink);background:#F1ECE3}
+@media(min-width:900px){
+  body{padding-bottom:40px}
+  nav.bottom{position:sticky;top:0;bottom:auto;background:var(--bg);border:none;border-bottom:1px solid var(--line);justify-content:center;gap:6px;padding:10px;backdrop-filter:none}
+  nav.bottom button{flex:none;flex-direction:row;gap:8px;padding:9px 16px;border-radius:999px;font-size:14px}
+  nav.bottom button i{font-size:17px}
+  nav.bottom button.on{background:var(--ink);color:#fff}
+  .view{padding-top:20px}
+}
+.view{display:none}.view.on{display:block;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.mt{margin-top:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.big{font-family:Fraunces,serif;font-size:42px;line-height:1;font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.p-teal{background:var(--teal-soft);color:var(--teal)}.p-coral{background:var(--coral-soft);color:var(--coral)}
+.p-gold{background:var(--gold-soft);color:#8a5d00}.p-blue{background:var(--blue-soft);color:var(--blue)}
+.p-violet{background:var(--violet-soft);color:var(--violet)}.p-grey{background:#EEE;color:#555}
+.btn{background:var(--ink);color:#fff;border-radius:12px;padding:10px 15px;font-weight:700}
+.btn.sec{background:#EFEAE1;color:var(--ink)}.btn.teal{background:var(--teal)}.btn.coral{background:var(--coral)}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{opacity:.5}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nowrap{flex-wrap:nowrap}
+.muted{color:var(--muted)}.small{font-size:13px}
+.hero{background:linear-gradient(135deg,#16211F 0%,#1f3a36 100%);color:#fff;border:none;position:relative;overflow:hidden}
+.hero .lbl{color:#9FC7BF}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(228,87,46,.45),transparent 70%);pointer-events:none}
+.alert{border-left:4px solid var(--coral);background:var(--coral-soft);padding:10px 12px;border-radius:10px;font-size:14px;margin-bottom:8px}
+.alert.info{border-color:var(--blue);background:var(--blue-soft)}
+.alert.good{border-color:var(--teal);background:var(--teal-soft)}
+.water{display:flex;gap:16px;align-items:center}
+.ring{position:relative;width:120px;height:120px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .v b{font-family:Fraunces,serif;font-size:24px}
+.glasses{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.gl{width:15px;height:21px;border:2px solid var(--blue);border-top:none;border-radius:0 0 5px 5px;position:relative}
+.gl.f::after{content:"";position:absolute;inset:3px 1px 1px;background:var(--blue);border-radius:0 0 3px 3px;opacity:.75}
+.item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:none}
+.chk{width:22px;height:22px;border-radius:7px;border:2px solid #C8C1B4;flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center}
+.chk.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.chk.on::after{content:"✓";font-size:13px;font-weight:800}
+.done .t{text-decoration:line-through;color:var(--muted)}
+.x{margin-left:auto;color:#b5ada0;font-size:20px;line-height:1;padding:0 6px}
+.ev{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.ev:last-child{border:none}
+.ev .d{text-align:center;border-radius:12px;padding:7px 2px;background:#F1ECE3;align-self:start}
+.ev .d b{display:block;font-family:Fraunces,serif;font-size:22px;line-height:1}
+.ev .d small{font-size:10px;text-transform:uppercase;font-weight:800;color:var(--muted)}
+.ev.soon .d{background:var(--coral);color:#fff}.ev.soon .d small{color:#ffe1d6}
+.ev.past{opacity:.5}
+.bar{height:8px;background:#EEE8DE;border-radius:9px;overflow:hidden;flex:1;min-width:80px}
+.bar i{display:block;height:100%;background:var(--teal);border-radius:9px;transition:width .3s}
+input[type=range]{padding:0;border:none;accent-color:var(--teal);height:28px}
+.calhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal .dn{font-size:10px;font-weight:800;text-align:center;color:var(--muted);padding:3px 0;text-transform:uppercase}
+.cd{min-height:58px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:4px;font-size:11px;cursor:pointer;overflow:hidden}
+.cd.out{opacity:.35}.cd.today{border:2px solid var(--teal)}.cd.sel{background:var(--teal-soft)}
+.cd .n{font-weight:800;font-size:12px}
+.dots{display:flex;gap:2px;flex-wrap:wrap;margin-top:3px}
+.dots s{width:7px;height:7px;border-radius:50%;display:block}
+.tag{display:inline-block;padding:2px 7px;border-radius:6px;font-weight:700;font-size:12px}
+.t-eval{background:var(--coral-soft);color:var(--coral)}.t-cours{background:var(--blue-soft);color:var(--blue)}
+.t-perso{background:var(--violet-soft);color:var(--violet)}.t-sante{background:var(--teal-soft);color:var(--teal)}.t-autre{background:#EEE;color:#555}
+s.t-eval{background:var(--coral)}s.t-cours{background:var(--blue)}s.t-perso{background:var(--violet)}s.t-sante{background:var(--teal)}s.t-autre{background:#999}
+@media(min-width:700px){.cd{min-height:80px}.cd .tag{display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}.dots{display:none}}
+@media(max-width:699px){.cd .tag{display:none}}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{padding:8px 13px;border-radius:999px;background:#EFEAE1;font-weight:700;font-size:13px}
+.seg button.on{background:var(--teal);color:#fff}
+.chart{display:flex;align-items:flex-end;gap:8px;height:130px;padding-top:10px}
+.chart .c{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.chart .c i{display:block;width:100%;max-width:34px;border-radius:7px 7px 3px 3px;background:var(--blue);min-height:3px}
+.chart .c i.goal{background:var(--teal)}
+.chart .c small{font-size:11px;color:var(--muted);font-weight:700}
+.chart .c em{font-style:normal;font-size:10px;color:var(--muted)}
+.gymweek{display:flex;gap:5px}
+.gymweek div{flex:1;text-align:center;padding:7px 0;border-radius:10px;background:#F1ECE3;font-size:10px;font-weight:800;color:var(--muted)}
+.gymweek div.on{background:var(--ink);color:#fff}
+.meal{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:center}
+.meal:last-child{border:none}
+.meal .k{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--teal);width:74px;flex:none}
+.kpi{display:flex;gap:8px;flex-wrap:wrap}
+.kpi>div{flex:1;min-width:100px;background:#F7F4EE;border-radius:12px;padding:10px 12px}
+.kpi b{font-family:Fraunces,serif;font-size:22px;display:block}
+.fb li{margin-left:18px;margin-bottom:4px}
+.empty{color:var(--muted);font-size:14px;padding:8px 0}
+.stars button{font-size:24px;color:#D6CFC2;padding:0 2px}.stars button.on{color:var(--gold)}
+.switch{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);gap:12px}
+.switch:last-child{border:none}
+.tg{width:48px;height:28px;border-radius:99px;background:#D9D2C6;position:relative;flex:none;transition:.2s}
+.tg::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg.on{background:var(--teal)}.tg.on::after{left:23px}
+.toast{position:fixed;left:50%;bottom:calc(96px + var(--sb));transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;opacity:0;transition:.25s;z-index:50;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.sheet{position:fixed;inset:0;background:rgba(22,33,31,.45);z-index:40;display:none;align-items:flex-end;justify-content:center}
+.sheet.on{display:flex}
+.sheet .in{background:var(--bg);width:100%;max-width:560px;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + var(--sb));max-height:88vh;overflow:auto;animation:up .25s ease}
+@media(min-width:700px){.sheet{align-items:center}.sheet .in{border-radius:22px}}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.steps li{margin:0 0 8px 20px}
+code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+<header class="top wrap">
+  <div class="toprow">
+    <div>
+      <h1 class="hello">Salut <span>Thyvan</span> 👋</h1>
+      <div class="sub" id="today-str"></div>
+    </div>
+    <button class="iconbtn" id="open-settings" aria-label="Réglages">⚙️<span class="d off" id="sync-dot"></span></button>
+  </div>
+</header>
+
+<nav class="bottom" id="tabs">
+  <button class="on" data-v="home"><i>🏠</i>Accueil</button>
+  <button data-v="agenda"><i>📅</i>Agenda</button>
+  <button data-v="evals"><i>🎯</i>Évals</button>
+  <button data-v="sante"><i>💪</i>Santé</button>
+  <button data-v="taches"><i>✅</i>Tâches</button>
+</nav>
+
+<main class="wrap">
+<!-- ACCUEIL -->
+<section class="view on" id="v-home">
+  <div class="grid g2">
+    <div class="card hero" id="next-eval"></div>
+    <div class="card"><h3>⚠️ À ne pas rater</h3><div id="alerts"></div></div>
+  </div>
+  <div class="grid g3 mt">
+    <div class="card">
+      <h3>💧 Hydratation</h3>
+      <div class="water">
+        <div class="ring"><svg width="120" height="120"><circle cx="60" cy="60" r="50" stroke="#EEE8DE" stroke-width="12" fill="none"/><circle id="ring-c" cx="60" cy="60" r="50" stroke="#2563EB" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16" style="transition:stroke-dashoffset .4s"/></svg>
+          <div class="v"><b id="w-val">0 L</b><span class="small muted">/ 2,5 L</span></div></div>
+        <div>
+          <div class="row"><button class="btn sec" data-w="250">+25 cl</button><button class="btn sec" data-w="500">+50 cl</button></div>
+          <div class="row" style="margin-top:6px"><button class="btn sec" data-w="-250">−25 cl</button></div>
+          <div class="glasses" id="glasses"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🏋️ Salle aujourd'hui</h3>
+      <div class="seg" id="gym-home"></div>
+      <div class="small muted" style="margin-top:12px" id="gym-streak"></div>
+      <div class="gymweek" style="margin-top:8px" id="gymweek-home"></div>
+    </div>
+    <div class="card">
+      <h3>✅ À faire bientôt</h3>
+      <div id="home-tasks"></div>
+      <form class="row nowrap" id="quick-task" style="margin-top:8px"><input placeholder="Ajouter une tâche…" id="qt"><button class="btn">+</button></form>
+    </div>
+  </div>
+  <div class="grid g2 mt">
+    <div class="card"><h3>📆 Les 7 prochains jours</h3><div id="home-week"></div></div>
+    <div class="card"><h3>📝 Quoi réviser aujourd'hui</h3><div id="home-rev"></div></div>
+  </div>
+</section>
+
+<!-- AGENDA -->
+<section class="view" id="v-agenda">
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+    <div class="card" style="grid-column:span 2;min-width:0">
+      <div class="calhead"><button class="btn sec" id="prev">←</button><h3 id="cal-title" style="margin:0"></h3><button class="btn sec" id="next">→</button></div>
+      <div class="cal" id="cal"></div>
+      <div class="row small" style="margin-top:10px"><span class="tag t-eval">Éval</span><span class="tag t-cours">Cours</span><span class="tag t-perso">Perso</span><span class="tag t-sante">Santé</span><span class="tag t-autre">Autre</span></div>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><h3 id="day-title">Jour</h3><div id="day-list"></div></div>
+      <div class="card">
+        <h3>➕ Nouvel événement</h3>
+        <form id="ev-form" class="grid" style="gap:8px">
+          <input id="ev-title" placeholder="Titre (TD bioméca, anniv…)" required>
+          <div class="row nowrap"><input type="date" id="ev-date" required><input type="time" id="ev-time"></div>
+          <select id="ev-type"><option value="cours">Cours / TD</option><option value="eval">Éval</option><option value="perso">Perso</option><option value="sante">Santé / sport</option><option value="autre">Autre</option></select>
+          <button class="btn teal">Ajouter</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EVALS -->
+<section class="view" id="v-evals">
+  <div class="grid g2">
+    <div class="card" style="grid-column:1/-1">
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0">🎯 Contrôles continus P2</h3>
+        <div class="seg" id="ev-filter"><button class="on" data-f="up">À venir</button><button data-f="all">Tout</button><button data-f="past">Passés</button></div>
+      </div>
+      <p class="small muted">Calendrier officiel du 09/11/2026. Glisse la barre pour noter où tu en es dans tes révisions.</p>
+      <div id="ev-list"></div>
+    </div>
+    <div class="card">
+      <h3>📊 Mes résultats</h3>
+      <div id="results"></div>
+      <form id="res-form" class="grid" style="gap:8px;margin-top:10px">
+        <div class="lbl">Ajouter une note</div>
+        <div class="row nowrap"><input id="res-ue" placeholder="UE (ex. UE 2.3)" required><input id="res-note" placeholder="Note (ex. 14/20)" required style="width:120px"></div>
+        <input id="res-com" placeholder="Commentaire / points à retravailler">
+        <button class="btn sec">Ajouter</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3>🧠 Méthode de révision</h3>
+      <ul class="fb small">
+        <li><b>J-14</b> : relire le CM + fiche synthèse par UE</li>
+        <li><b>J-7</b> : QCM / Wooflash, repérer les trous</li>
+        <li><b>J-3</b> : retravailler seulement les points faibles</li>
+        <li><b>J-1</b> : relecture légère + dodo tôt (7–9 h)</li>
+        <li><b>PAO (oral)</b> : interrogatoire → tests (méthodo à voix haute) → diagnostic → technique justifiée, en binôme</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- SANTE -->
+<section class="view" id="v-sante">
+  <div class="row nowrap" style="margin-bottom:12px"><span class="lbl">Jour :</span><input type="date" id="h-date" style="width:auto"><button class="btn sec" id="h-today">Auj.</button></div>
+  <div class="grid g3">
+    <div class="card">
+      <h3>💧 Eau</h3>
+      <div class="kpi"><div><span class="lbl">Bu</span><b id="h-water">0 L</b></div><div><span class="lbl">Objectif</span><b>2,5 L</b></div></div>
+      <div class="row" style="margin-top:10px"><button class="btn sec" data-hw="250">+25 cl</button><button class="btn sec" data-hw="500">+50 cl</button><button class="btn sec" data-hw="-250">−25 cl</button></div>
+      <p class="small muted" style="margin-top:10px">≈ 35 ml/kg pour 70 kg. Ajoute ~0,5 L les jours de salle.</p>
+    </div>
+    <div class="card">
+      <h3>🏋️ Séance</h3>
+      <div class="seg" id="gym-h"></div>
+      <div class="row nowrap" style="margin-top:10px"><input type="number" inputmode="numeric" min="0" step="5" placeholder="Durée (min)" id="gym-dur" style="width:130px"><input placeholder="Notes (charges, PR…)" id="gym-note"></div>
+    </div>
+    <div class="card">
+      <h3>😴 Sommeil & forme</h3>
+      <div class="row nowrap"><span class="lbl" style="width:70px">Sommeil</span><input type="number" inputmode="decimal" min="0" max="14" step="0.5" id="sleep" placeholder="heures" style="width:110px"></div>
+      <div class="row nowrap" style="margin-top:10px"><span class="lbl" style="width:70px">Énergie</span><div class="stars" id="energy"></div></div>
+      <div class="row nowrap" style="margin-top:10px"><span class="lbl" style="width:70px">Humeur</span><div class="seg" id="mood"></div></div>
+    </div>
+  </div>
+  <div class="grid g2 mt">
+    <div class="card">
+      <h3>🍽️ Repas</h3>
+      <div id="meals"></div>
+      <form id="meal-form" class="row nowrap" style="margin-top:10px">
+        <select id="meal-k" style="width:118px"><option>Petit-déj</option><option>Déjeuner</option><option>Collation</option><option>Dîner</option></select>
+        <input id="meal-d" placeholder="Ce que tu as mangé…" required>
+        <button class="btn teal">+</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3>📈 7 derniers jours</h3>
+      <div class="lbl">Eau (L)</div>
+      <div class="chart" id="w-chart"></div>
+      <div class="lbl" style="margin-top:12px">Salle</div>
+      <div class="gymweek" style="margin-top:6px" id="gymweek"></div>
+      <div class="kpi" style="margin-top:12px" id="week-kpi"></div>
+    </div>
+  </div>
+</section>
+
+<!-- TACHES -->
+<section class="view" id="v-taches">
+  <div class="grid g2">
+    <div class="card">
+      <h3>➕ Nouvelle tâche</h3>
+      <form id="task-form" class="grid" style="gap:8px">
+        <input id="tk-title" placeholder="Ex. Justifier mon absence UE 5.8" required>
+        <div class="row nowrap"><input type="date" id="tk-date"><select id="tk-cat"><option value="etudes">Études</option><option value="perso">Perso</option><option value="sante">Santé</option><option value="admin">Admin</option></select></div>
+        <button class="btn teal">Ajouter</button>
+      </form>
+    </div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">📋 Mes tâches</h3><div class="seg" id="tk-filter"><button class="on" data-f="todo">À faire</button><button data-f="done">Faites</button></div></div><div id="task-list" style="margin-top:8px"></div></div>
+  </div>
+</section>
+</main>
+
+<!-- REGLAGES -->
+<div class="sheet" id="settings"><div class="in">
+  <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:22px">Réglages</h2><button class="btn sec" data-close>Fermer</button></div>
+
+  <div class="card">
+    <h3>☁️ Compte & synchro</h3>
+    <div id="acct"></div>
+  </div>
+
+  <div class="card mt">
+    <h3>🔔 Notifications</h3>
+    <div id="notif-status" class="small muted" style="margin-bottom:8px"></div>
+    <div class="switch"><div><b>Évals</b><div class="small muted">La veille à 20h et le matin même</div></div><button class="tg" data-pref="evals"></button></div>
+    <div class="switch"><div><b>Eau</b><div class="small muted">10h, 13h, 16h, 19h si tu es en retard</div></div><button class="tg" data-pref="water"></button></div>
+    <div class="switch"><div><b>Tâches & agenda</b><div class="small muted">Résumé de la journée à 8h</div></div><button class="tg" data-pref="tasks"></button></div>
+    <div class="switch"><div><b>Bilan du soir</b><div class="small muted">21h, si rien n'est noté</div></div><button class="tg" data-pref="evening"></button></div>
+    <div class="row mt"><button class="btn teal" id="notif-on">Activer sur cet appareil</button><button class="btn sec" id="notif-test">Tester</button></div>
+  </div>
+
+  <div class="card mt">
+    <h3>📅 Calendrier du téléphone</h3>
+    <p class="small muted">Ajoute tous tes CC (avec alertes la veille et 2 h avant) dans l'app Calendrier.</p>
+    <button class="btn sec mt" id="ics">Télécharger les évals (.ics)</button>
+  </div>
+
+  <div class="card mt">
+    <h3>📲 Installer l'app</h3>
+    <ul class="steps small">
+      <li><b>iPhone</b> : ouvre ce lien dans <b>Safari</b> → bouton Partager → « Sur l'écran d'accueil ».</li>
+      <li><b>Android</b> : Chrome → menu ⋮ → « Installer l'application ».</li>
+      <li><b>PC / Mac</b> : Chrome ou Edge → icône d'installation dans la barre d'adresse.</li>
+    </ul>
+    <button class="btn sec" id="install" style="display:none">Installer maintenant</button>
+  </div>
+
+  <div class="card mt">
+    <h3>💾 Sauvegarde</h3>
+    <div class="row"><button class="btn sec" id="export">Copier mes données</button><button class="btn sec" id="import">Importer…</button></div>
+    <p class="small muted" style="margin-top:8px" id="ver">Version 1.0</p>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="cc.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
