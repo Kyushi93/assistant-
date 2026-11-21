@@ -8,6 +8,16 @@ const LS = "thyvan-assistant-v1";
 const CC = (window.CC_DATA || []).map(r => ({ id: r[0] + "|" + r[1] + "|" + r[3], date: r[0], ue: r[1], name: r[2], cc: r[3], mod: r[4], note: r[5] || "", status: r[6] || "" }));
 const isOff = c => /annul/i.test(c.status || "");
 let NEWS = [];
+let EDT = []; try { EDT = JSON.parse(localStorage.getItem("thy-edt") || "[]"); } catch (e) {}
+let edtAt = 0;
+const KIND = { CM: "CM", TD: "TD", TP_PAO: "PAO", FC_I: "Clinique" };
+function edtLabel(r) { const c = CC.find(x => x.ue === "UE " + r[3]); return (KIND[r[4]] || r[4]) + " · UE " + r[3] + (c ? " " + c.name : "") + (r[5] ? " · " + r[5] : "") + (r[6] ? " (" + r[6] + ")" : ""); }
+async function loadEdt(force) {
+  if (!user || (!force && Date.now() - edtAt < 300000)) return;
+  edtAt = Date.now();
+  const { data } = await sb.from("edt").select("data").maybeSingle();
+  if (data && Array.isArray(data.data)) { EDT = data.data; try { localStorage.setItem("thy-edt", JSON.stringify(EDT)); } catch (e) {} renderAll(); }
+}
 const NEWS_ICON = { cancel: "❌", change: "🔁", new: "🆕", result: "📊", info: "📩", course: "📚" };
 const BASE_RESULTS = [
   { id: "r57", ue: "UE 5.7 — PAO Thoraco-scapulaire", date: "05/11", note: "13,7 / 20", cls: "p-gold",
@@ -82,6 +92,7 @@ async function pullRemote() {
     renderAll();
   } else if ((S.updatedAt || 0) > remoteAt + 500) { await pushRemote(); }
   setDot("ok");
+  loadEdt();
 }
 async function initCloud() {
   if (!HAS_CLOUD) { setDot("off"); renderAcct(); return; }
@@ -90,7 +101,7 @@ async function initCloud() {
     sb = createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
     const { data } = await sb.auth.getSession();
     user = data.session ? data.session.user : null;
-    sb.auth.onAuthStateChange((_e, sess) => { const was = user; user = sess ? sess.user : null; renderAcct(); if (user && !was) pullRemote(); });
+    sb.auth.onAuthStateChange((_e, sess) => { const was = user; user = sess ? sess.user : null; renderAcct(); if (user && !was) pullRemote(); if (!user && was) { EDT = []; try { localStorage.removeItem("thy-edt"); } catch (e) {} } });
     renderAcct();
     if (user) await pullRemote(); else setDot("off");
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pullRemote(); });
@@ -245,7 +256,8 @@ let calM = new Date(); calM.setDate(1); let selD = TODAY();
 function eventsOn(s) {
   const a = CC.filter(c => c.date === s).map(c => ({ t: (isOff(c) ? "❌ " : "") + c.ue + " " + c.cc + " · " + c.name + (c.status ? " (" + c.status + ")" : ""), type: isOff(c) ? "autre" : "eval", h: c.id === "2026-11-25|UE 5.6|CC1" ? "11:11" : "" }));
   const b = S.events.filter(e => e.d === s).sort((x, y) => (x.h || "") < (y.h || "") ? -1 : 1).map(e => ({ t: e.t, type: e.type, h: e.h, id: e.id }));
-  return a.concat(b);
+  const k = EDT.filter(r => r[0] === s).map(r => ({ t: edtLabel(r), type: "cours", h: r[1] + "–" + r[2] }));
+  return a.concat(k.concat(b).sort((x, y) => (x.h || "") < (y.h || "") ? -1 : 1));
 }
 function renderCal() {
   $("cal-title").textContent = MOIS[calM.getMonth()].replace(/^./, c => c.toUpperCase()) + " " + calM.getFullYear();
@@ -420,7 +432,7 @@ loadNews();
 $("refresh").onclick = async () => {
   const b = $("refresh"); b.classList.add("spin");
   try {
-    if (user) { if (pushT) { clearTimeout(pushT); pushT = null; await pushRemote(); } await pullRemote(); }
+    if (user) { if (pushT) { clearTimeout(pushT); pushT = null; await pushRemote(); } await pullRemote(); await loadEdt(true); }
     loadNews(); if (swReg) swReg.update().catch(() => {});
   } catch (e) { console.warn(e); }
   renderAll(); setTimeout(() => b.classList.remove("spin"), 500);
