@@ -5,7 +5,10 @@ const GOAL = 2500;
 const LS = "thyvan-assistant-v1";
 
 /* ---------- Données fixes ---------- */
-const CC = (window.CC_DATA || []).map(r => ({ id: r[0] + "|" + r[1] + "|" + r[3], date: r[0], ue: r[1], name: r[2], cc: r[3], mod: r[4], note: r[5] || "" }));
+const CC = (window.CC_DATA || []).map(r => ({ id: r[0] + "|" + r[1] + "|" + r[3], date: r[0], ue: r[1], name: r[2], cc: r[3], mod: r[4], note: r[5] || "", status: r[6] || "" }));
+const isOff = c => /annul/i.test(c.status || "");
+let NEWS = [];
+const NEWS_ICON = { cancel: "❌", change: "🔁", new: "🆕", result: "📊", info: "📩", course: "📚" };
 const BASE_RESULTS = [
   { id: "r57", ue: "UE 5.7 — PAO Thoraco-scapulaire", date: "05/11", note: "13,7 / 20", cls: "p-gold",
     good: ["Positionnement patient & praticien", "Repérage, accord palpatoire, mise en tension", "Communication & hygiène"],
@@ -138,7 +141,7 @@ $("open-settings").onclick = () => { renderNotif(); $("settings").classList.add(
 $("settings").onclick = e => { if (e.target.id === "settings" || e.target.closest("[data-close]")) $("settings").classList.remove("on"); };
 
 /* ---------- ACCUEIL ---------- */
-const upcomingCC = () => CC.filter(c => diffDays(c.date) >= 0);
+const upcomingCC = () => CC.filter(c => diffDays(c.date) >= 0 && !isOff(c));
 function renderHome() {
   const t = new Date();
   $("today-str").textContent = JOURS[t.getDay()].replace(".", "") + " " + t.getDate() + " " + MOIS[t.getMonth()] + " · P2 ostéo";
@@ -154,6 +157,7 @@ function renderHome() {
   } else he.innerHTML = `<div class="lbl">Prochaine éval</div><div class="big">🎉</div><p>Aucune éval à venir.</p>`;
 
   const al = [];
+  NEWS.filter(n => n.date && diffDays(n.date) >= -14).sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 5).forEach(n => al.push(`<div class="alert ${n.type === "cancel" || n.type === "change" ? "" : "info"}">${NEWS_ICON[n.type] || "📩"} <b>${esc(n.title)}</b>${n.body ? " — " + esc(n.body) : ""}<div class="small muted" style="margin-top:2px">${esc(n.source || "Mail de l'école")} · ${parse(n.date).getDate()} ${MC[parse(n.date).getMonth()]}</div></div>`));
   if (diffDays("2026-11-25") >= 0) al.push(`<div class="alert">🎯 <b>CC UE 5.6 PAO LP</b> — mer. 25/11, convocation <b>11h11</b> (passage 11h26), groupe E.</div>`);
   const t58 = S.tasks.find(x => /5\.8/.test(x.t) && /absence/i.test(x.t));
   if (t58 && !t58.done) al.push(`<div class="alert">📩 <b>UE 5.8 (16/11)</b> : noté <b>absent</b>. Vérifie la justification et le rattrapage.</div>`);
@@ -239,7 +243,7 @@ $("quick-task").onsubmit = e => { e.preventDefault(); const t = $("qt"); if (!t.
 /* ---------- AGENDA ---------- */
 let calM = new Date(); calM.setDate(1); let selD = TODAY();
 function eventsOn(s) {
-  const a = CC.filter(c => c.date === s).map(c => ({ t: c.ue + " " + c.cc + " · " + c.name, type: "eval", h: c.id === "2026-11-25|UE 5.6|CC1" ? "11:11" : "" }));
+  const a = CC.filter(c => c.date === s).map(c => ({ t: (isOff(c) ? "❌ " : "") + c.ue + " " + c.cc + " · " + c.name + (c.status ? " (" + c.status + ")" : ""), type: isOff(c) ? "autre" : "eval", h: c.id === "2026-11-25|UE 5.6|CC1" ? "11:11" : "" }));
   const b = S.events.filter(e => e.d === s).sort((x, y) => (x.h || "") < (y.h || "") ? -1 : 1).map(e => ({ t: e.t, type: e.type, h: e.h, id: e.id }));
   return a.concat(b);
 }
@@ -275,10 +279,11 @@ function renderEvals() {
   $("ev-list").innerHTML = l.map(c => {
     const n = diffDays(c.date), d = parse(c.date), p = S.rev[c.id] || 0;
     const mc = c.mod === "QCM" ? "p-blue" : c.mod === "Oral" ? "p-violet" : "p-gold";
-    return `<div class="ev ${n >= 0 && n <= 7 ? "soon" : ""} ${n < 0 ? "past" : ""}"><div class="d"><small>${JOURS[d.getDay()]}</small><b>${d.getDate()}</b><small>${MC[d.getMonth()]}</small></div>
-    <div><div class="row"><b>${c.ue}</b><span>${esc(c.name)}</span></div><div class="row" style="margin-top:4px"><span class="pill ${mc}">${c.mod}</span><span class="pill p-grey">${c.cc}</span>${n >= 0 ? `<span class="pill ${n <= 7 ? "p-coral" : "p-teal"}">${jx(n)}</span>` : ""}</div>
+    const off = isOff(c);
+    return `<div class="ev ${n >= 0 && n <= 7 && !off ? "soon" : ""} ${n < 0 || off ? "past" : ""}"><div class="d"><small>${JOURS[d.getDay()]}</small><b>${d.getDate()}</b><small>${MC[d.getMonth()]}</small></div>
+    <div><div class="row"><b>${c.ue}</b><span style="${off ? "text-decoration:line-through" : ""}">${esc(c.name)}</span>${c.status ? `<span class="pill p-coral">${esc(c.status)}</span>` : ""}</div><div class="row" style="margin-top:4px"><span class="pill ${mc}">${c.mod}</span><span class="pill p-grey">${c.cc}</span>${n >= 0 ? `<span class="pill ${n <= 7 ? "p-coral" : "p-teal"}">${jx(n)}</span>` : ""}</div>
     ${c.note ? `<div class="small muted" style="margin-top:4px">📍 ${esc(c.note)}</div>` : ""}
-    ${n >= 0 ? `<div class="row nowrap small" style="margin-top:6px"><span class="muted">Révisé</span><input type="range" min="0" max="100" step="10" value="${p}" data-rev="${esc(c.id)}" style="flex:1;max-width:260px"><b style="width:38px">${p}%</b></div>` : ""}</div></div>`;
+    ${n >= 0 && !off ? `<div class="row nowrap small" style="margin-top:6px"><span class="muted">Révisé</span><input type="range" min="0" max="100" step="10" value="${p}" data-rev="${esc(c.id)}" style="flex:1;max-width:260px"><b style="width:38px">${p}%</b></div>` : ""}</div></div>`;
   }).join("") || `<div class="empty">Rien ici.</div>`;
   const all = BASE_RESULTS.concat(S.results);
   $("results").innerHTML = all.map(r => `<div class="item" style="display:block"><div class="row"><b>${esc(r.ue)}</b><span class="pill ${r.cls || "p-teal"}">${esc(r.note)}</span><span class="small muted">${esc(r.date || "")}</span>${S.results.includes(r) ? `<button class="x" data-delres="${r.id}">×</button>` : ""}</div>
@@ -410,3 +415,6 @@ let lastDay = TODAY();
 setInterval(() => { if (TODAY() !== lastDay) { lastDay = TODAY(); hd.value = lastDay; renderAll(); } }, 60000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { swReg = r; }).catch(e => console.warn(e));
 initCloud();
+function loadNews() { fetch("news.json?ts=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.json() : []).then(j => { NEWS = Array.isArray(j) ? j : (j.items || []); renderAll(); }).catch(() => {}); }
+loadNews();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadNews(); });
