@@ -252,36 +252,111 @@ $("task-form").onsubmit = e => { e.preventDefault(); const t = $("tk-title"); S.
 $("quick-task").onsubmit = e => { e.preventDefault(); const t = $("qt"); if (!t.value.trim()) return; S.tasks.push({ id: uid(), t: t.value.trim(), d: TODAY(), c: "perso", done: false }); t.value = ""; save(); renderAll(); };
 
 /* ---------- AGENDA ---------- */
-let calM = new Date(); calM.setDate(1); let selD = TODAY();
-function eventsOn(s) {
-  const a = CC.filter(c => c.date === s).map(c => ({ t: (isOff(c) ? "❌ " : "") + c.ue + " " + c.cc + " · " + c.name + (c.status ? " (" + c.status + ")" : ""), type: isOff(c) ? "autre" : "eval", h: c.id === "2026-11-25|UE 5.6|CC1" ? "11:11" : "" }));
-  const b = S.events.filter(e => e.d === s).sort((x, y) => (x.h || "") < (y.h || "") ? -1 : 1).map(e => ({ t: e.t, type: e.type, h: e.h, id: e.id }));
-  const k = EDT.filter(r => r[0] === s).map(r => ({ t: edtLabel(r), type: "cours", h: r[1] + "–" + r[2] }));
-  return a.concat(k.concat(b).sort((x, y) => (x.h || "") < (y.h || "") ? -1 : 1));
+// Couleurs reprises d'Aurion : PAO rose, CM bleu foncé, TD bleu clair, clinique turquoise, éval rouge
+const KCOL = { pao: "#F266CF", cm: "#111E93", td: "#0F63EE", clin: "#008080", eval: "#DC2626", perso: "#7C3AED", sante: "#0F766E", autre: "#6B746F", cours: "#0F63EE", off: "#9CA3AF" };
+const KNAME = { pao: "PAO", cm: "CM", td: "TD", clin: "Clinique", eval: "Éval", perso: "Perso", sante: "Santé", autre: "Autre", cours: "Cours", off: "Annulé" };
+const EKIND = { TP_PAO: "pao", CM: "cm", TD: "td", FC_I: "clin" };
+function profName(p) {
+  if (!p) return "";
+  return p.split(/\s*,\s*/).map(x => { const m = x.match(/^([A-ZÀ-Ý' \-]+?)\s*([A-ZÀ-Ý][a-zà-ÿ].*)$/); return m ? m[2] + " " + m[1].charAt(0) + m[1].slice(1).toLowerCase() : x; }).join(", ");
 }
+function ueName(code) { const c = CC.find(x => x.ue === "UE " + code); return c ? c.name : ""; }
+// Tous les éléments d'une journée, au même format
+function dayItems(s) {
+  const out = [];
+  CC.filter(c => c.date === s).forEach(c => out.push({ k: isOff(c) ? "off" : "eval", s: c.id === "2026-11-25|UE 5.6|CC1" ? "11:11" : "", e: "", title: (isOff(c) ? "❌ " : "") + c.ue + " " + c.cc + " · " + c.name, sub: c.mod + (c.status ? " · " + c.status : ""), room: "", prof: "", note: c.note }));
+  EDT.filter(r => r[0] === s).forEach(r => {
+    const ep = r[9] === 1 || r[9] === true;
+    out.push({ k: ep ? "eval" : (EKIND[r[4]] || "td"), s: r[1], e: r[2], title: (ep ? "🎯 " : "") + "UE " + r[3] + " · " + (r[7] || ueName(r[3]) || ""), sub: (KNAME[EKIND[r[4]]] || r[4]) + (r[6] ? " · " + r[6] : ""), room: r[5] || "", prof: profName(r[8] || "") });
+  });
+  S.events.filter(e => e.d === s).forEach(e => out.push({ k: e.type === "eval" ? "eval" : e.type === "cours" ? "td" : (e.type || "autre"), s: e.h || "", e: "", title: e.t, sub: KNAME[e.type] || "", room: "", prof: "", id: e.id }));
+  return out.sort((a, b) => (a.s || "99") < (b.s || "99") ? -1 : 1);
+}
+// Compatibilité (accueil : 7 prochains jours)
+function eventsOn(s) { return dayItems(s).map(i => ({ t: i.title + (i.room ? " · " + i.room : ""), type: i.k, h: i.s ? i.s + (i.e ? "–" + i.e : "") : "", id: i.id })); }
+
+function card(i, big) {
+  return `<div class="ecard ${big ? "lg" : ""}" style="--c:${KCOL[i.k] || KCOL.autre}">
+    <div class="et">${i.s ? `<b>${i.s.replace(":", "h")}</b>${i.e ? `<span>${i.e.replace(":", "h")}</span>` : ""}` : `<b>—</b>`}</div>
+    <div class="eb"><div class="ek">${KNAME[i.k] || ""}${i.sub && i.sub !== KNAME[i.k] ? ` · ${esc(i.sub.replace(KNAME[i.k] + " · ", "").replace(KNAME[i.k], ""))}` : ""}</div>
+      <div class="en">${esc(i.title)}</div>
+      ${i.room ? `<div class="er">📍 ${esc(i.room)}</div>` : ""}
+      ${i.prof ? `<div class="ep">👤 ${esc(i.prof)}</div>` : ""}
+      ${i.note ? `<div class="ep">${esc(i.note)}</div>` : ""}
+    </div>${i.id ? `<button class="x" data-delev="${i.id}" aria-label="Supprimer">×</button>` : ""}</div>`;
+}
+
+let calView = "week"; let selD = TODAY();
+const addD = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+const monday = s => { const d = parse(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return iso(d); };
 function renderCal() {
-  $("cal-title").textContent = MOIS[calM.getMonth()].replace(/^./, c => c.toUpperCase()) + " " + calM.getFullYear();
-  let h = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"].map(d => `<div class="dn">${d}</div>`).join("");
-  const start = new Date(calM); start.setDate(1 - (start.getDay() + 6) % 7);
-  for (let i = 0; i < 42; i++) {
-    const x = new Date(start); x.setDate(start.getDate() + i); const s = iso(x); const ev = eventsOn(s);
-    h += `<div class="cd ${x.getMonth() !== calM.getMonth() ? "out" : ""} ${s === TODAY() ? "today" : ""} ${s === selD ? "sel" : ""}" data-cd="${s}"><div class="n">${x.getDate()}</div>
-    ${ev.slice(0, 3).map(e => `<span class="tag t-${e.type}">${esc(e.t)}</span>`).join("")}<div class="dots">${ev.slice(0, 4).map(e => `<s class="t-${e.type}"></s>`).join("")}</div></div>`;
+  document.querySelectorAll("#cal-views button").forEach(b => b.classList.toggle("on", b.dataset.cv === calView));
+  const d = parse(selD); let title = "", h = "";
+  if (calView === "month") {
+    title = MOIS[d.getMonth()].replace(/^./, c => c.toUpperCase()) + " " + d.getFullYear();
+    h = `<div class="mgrid">` + ["L", "M", "M", "J", "V", "S", "D"].map(x => `<div class="dn">${x}</div>`).join("");
+    const first = new Date(d.getFullYear(), d.getMonth(), 1); const start = new Date(first); start.setDate(1 - (first.getDay() + 6) % 7);
+    for (let i = 0; i < 42; i++) {
+      const x = new Date(start); x.setDate(start.getDate() + i); const s = iso(x); const it = dayItems(s);
+      if (i >= 35 && x.getMonth() !== d.getMonth()) break;
+      h += `<button class="mc ${x.getMonth() !== d.getMonth() ? "out" : ""} ${s === TODAY() ? "today" : ""} ${s === selD ? "sel" : ""}" data-cd="${s}"><span class="n">${x.getDate()}</span>
+        <span class="bars">${it.slice(0, 5).map(e => `<i style="background:${KCOL[e.k]}"></i>`).join("")}</span>
+        <span class="mt">${it.slice(0, 3).map(e => `<em style="background:${KCOL[e.k]}">${e.s ? e.s.replace(":", "h") + " " : ""}${esc(e.title.replace(/^UE /, ""))}</em>`).join("")}</span></button>`;
+    }
+    h += `</div><p class="small muted" style="margin-top:8px">Touche un jour pour voir le détail.</p>`;
+  } else if (calView === "week") {
+    const m = monday(selD); const sun = addD(m, 6);
+    title = `${parse(m).getDate()} ${MC[parse(m).getMonth()]} – ${parse(sun).getDate()} ${MC[parse(sun).getMonth()]}`;
+    h = `<div class="wgrid">`;
+    for (let i = 0; i < 7; i++) {
+      const s = addD(m, i); const it = dayItems(s); const x = parse(s);
+      if (i >= 5 && !it.length) continue;
+      h += `<div class="wday ${s === TODAY() ? "today" : ""}"><button class="wh" data-cd="${s}">${JOURS[x.getDay()]} <b>${x.getDate()}</b>${s === TODAY() ? ' <span class="pill p-teal">Auj.</span>' : ""}</button>
+        ${it.length ? it.map(e => card(e)).join("") : `<div class="empty">Rien</div>`}</div>`;
+    }
+    h += `</div>`;
+  } else {
+    title = JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()];
+    const it = dayItems(selD);
+    h = it.length ? `<div class="dlist">${it.map(e => card(e, true)).join("")}</div>` : `<div class="empty" style="padding:30px 0;text-align:center">Rien de prévu ce jour-là 🙌</div>`;
   }
-  $("cal").innerHTML = h;
-  const sd = parse(selD); $("day-title").textContent = JOURS[sd.getDay()] + " " + sd.getDate() + " " + MOIS[sd.getMonth()];
-  const ev = eventsOn(selD);
-  $("day-list").innerHTML = ev.length ? ev.map(e => `<div class="item"><span class="tag t-${e.type}">${e.h || "—"}</span><div class="t">${esc(e.t)}</div>${e.id ? `<button class="x" data-delev="${e.id}">×</button>` : ""}</div>`).join("") : `<div class="empty">Rien ce jour-là.</div>`;
+  $("cal-title").textContent = title.replace(/^./, c => c.toUpperCase());
+  $("cal-body").innerHTML = h;
   $("ev-date").value = selD;
 }
-$("cal").onclick = e => { const c = e.target.closest("[data-cd]"); if (!c) return; selD = c.dataset.cd; renderCal(); };
-$("prev").onclick = () => { calM.setMonth(calM.getMonth() - 1); renderCal(); };
-$("next").onclick = () => { calM.setMonth(calM.getMonth() + 1); renderCal(); };
+$("cal-views").onclick = e => { const b = e.target.closest("[data-cv]"); if (!b) return; calView = b.dataset.cv; renderCal(); };
+$("cal-body").onclick = e => { const c = e.target.closest("[data-cd]"); if (!c) return; selD = c.dataset.cd; calView = "day"; renderCal(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+$("prev").onclick = () => { const d = parse(selD); if (calView === "month") { d.setDate(1); d.setMonth(d.getMonth() - 1); selD = iso(d); } else selD = addD(selD, calView === "week" ? -7 : -1); renderCal(); };
+$("next").onclick = () => { const d = parse(selD); if (calView === "month") { d.setDate(1); d.setMonth(d.getMonth() + 1); selD = iso(d); } else selD = addD(selD, calView === "week" ? 7 : 1); renderCal(); };
+$("cal-today").onclick = () => { selD = TODAY(); renderCal(); };
+// Glisser à gauche / à droite pour changer de période
+{ let x0 = null; const el = $("cal-body"); el.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true }); el.addEventListener("touchend", e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 70) $(dx < 0 ? "next" : "prev").click(); x0 = null; }); }
 $("ev-form").onsubmit = e => {
   e.preventDefault(); const t = $("ev-title");
   S.events.push({ id: uid(), t: t.value.trim(), d: $("ev-date").value, h: $("ev-time").value, type: $("ev-type").value });
   selD = $("ev-date").value; t.value = ""; save(); renderAll(); toast("Événement ajouté");
 };
+
+/* ---------- Cours du jour (accueil) ---------- */
+function renderToday() {
+  const now = new Date(); const hm = pad(now.getHours()) + ":" + pad(now.getMinutes());
+  let s = TODAY(); let it = dayItems(s).filter(i => i.k !== "perso" && i.k !== "sante" && i.k !== "autre");
+  let label = "Aujourd'hui";
+  if (!it.length || it.every(i => (i.e || i.s || "00:00") < hm)) {
+    for (let n = 1; n <= 14; n++) { const s2 = addD(TODAY(), n); const it2 = dayItems(s2).filter(i => ["pao", "cm", "td", "clin", "eval"].includes(i.k)); if (it2.length) { s = s2; it = it2; const x = parse(s2); label = n === 1 ? "Demain" : JOURS[x.getDay()].replace(".", "") + " " + x.getDate() + " " + MC[x.getMonth()]; break; } }
+  }
+  const box = $("today-courses");
+  if (!it.length) { box.innerHTML = `<h3>📚 Mes cours</h3><div class="empty">Pas de cours dans les 2 prochaines semaines.</div>`; return; }
+  const nextI = s === TODAY() ? it.findIndex(i => (i.e || i.s) >= hm) : 0;
+  box.innerHTML = `<div class="row" style="justify-content:space-between"><h3 style="margin:0">📚 Mes cours · ${label}</h3><span class="small muted">${it.length} créneau${it.length > 1 ? "x" : ""}</span></div>
+    <div class="tlist">${it.map((i, n) => `<div class="tc ${s === TODAY() && (i.e || i.s) < hm ? "done" : ""} ${n === nextI ? "next" : ""}" style="--c:${KCOL[i.k]}">
+      <div class="th"><b>${i.s ? i.s.replace(":", "h") : "—"}</b><span>${i.e ? i.e.replace(":", "h") : ""}</span></div>
+      <div class="tb"><div class="tk">${KNAME[i.k]}${n === nextI && s === TODAY() ? (i.s <= hm ? " · en cours" : " · prochain") : ""}</div>
+        <div class="tn">${esc(i.title)}</div>
+        ${i.room ? `<div class="troom">📍 ${esc(i.room)}</div>` : ""}
+        ${i.prof ? `<div class="tprof">👤 ${esc(i.prof)}</div>` : ""}
+      </div></div>`).join("")}</div>`;
+}
 
 /* ---------- ÉVALS ---------- */
 let evF = "up";
@@ -420,11 +495,11 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferr
 $("install").onclick = async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; $("install").style.display = "none"; };
 
 /* ---------- Démarrage ---------- */
-function renderAll() { renderHome(); renderCal(); renderEvals(); renderSante(); renderTasks(); }
+function renderAll() { renderToday(); renderHome(); renderCal(); renderEvals(); renderSante(); renderTasks(); }
 seed(); try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {}
 renderAll();
 let lastDay = TODAY();
-setInterval(() => { if (TODAY() !== lastDay) { lastDay = TODAY(); hd.value = lastDay; renderAll(); } }, 60000);
+setInterval(() => { if (TODAY() !== lastDay) { lastDay = TODAY(); hd.value = lastDay; renderAll(); } else renderToday(); }, 60000);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { swReg = r; }).catch(e => console.warn(e));
 initCloud();
 function loadNews() { fetch("news.json?ts=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.json() : []).then(j => { NEWS = Array.isArray(j) ? j : (j.items || []); renderAll(); }).catch(() => {}); }
