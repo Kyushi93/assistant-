@@ -190,9 +190,25 @@ code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
 .tc .tn{font-weight:700;font-size:14px;margin-top:1px}
 .tc .troom{font-family:Fraunces,serif;font-size:22px;font-weight:700;margin-top:4px;line-height:1.15}
 .tc .tprof{font-size:15px;font-weight:600;margin-top:3px}
+/* v8 : coque d'app fixe (la barre du bas ne bouge plus au défilement) */
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;inset:0;width:100%;display:flex;flex-direction:column;padding-bottom:0!important}
+.statusbar{flex:none;height:var(--st);background:var(--bg)}
+#scroller{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding-bottom:24px}
+header.top{padding-top:16px!important}
+nav.bottom{position:relative!important;flex:none;order:2}
+@media(min-width:900px){.statusbar{order:-1}nav.bottom{order:0}#scroller{order:1}}
+.seg button{padding:8px 12px}
+#cal-today{padding:8px 12px;font-size:13px}
+.hero .big{white-space:nowrap}
+.card{min-width:0}
+.ecard .en,.tc .tn{overflow-wrap:anywhere}
+input[type=date],input[type=time]{min-width:0;-webkit-appearance:none;appearance:none;min-height:44px}
 </style>
 </head>
 <body>
+<div class="statusbar"></div>
+<div id="scroller">
 <header class="top wrap">
   <div class="toprow">
     <div>
@@ -203,13 +219,6 @@ code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
   </div>
 </header>
 
-<nav class="bottom" id="tabs">
-  <button class="on" data-v="home"><i>🏠</i>Accueil</button>
-  <button data-v="agenda"><i>📅</i>Agenda</button>
-  <button data-v="evals"><i>🎯</i>Évals</button>
-  <button data-v="sante"><i>💪</i>Santé</button>
-  <button data-v="taches"><i>✅</i>Tâches</button>
-</nav>
 
 <main class="wrap">
 <!-- ACCUEIL -->
@@ -364,6 +373,14 @@ code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
   </div>
 </section>
 </main>
+</div>
+<nav class="bottom" id="tabs">
+  <button class="on" data-v="home"><i>🏠</i>Accueil</button>
+  <button data-v="agenda"><i>📅</i>Agenda</button>
+  <button data-v="evals"><i>🎯</i>Évals</button>
+  <button data-v="sante"><i>💪</i>Santé</button>
+  <button data-v="taches"><i>✅</i>Tâches</button>
+</nav>
 
 <!-- REGLAGES -->
 <div class="sheet" id="settings"><div class="in">
@@ -377,9 +394,9 @@ code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
   <div class="card mt">
     <h3>🔔 Notifications</h3>
     <div id="notif-status" class="small muted" style="margin-bottom:8px"></div>
-    <div class="switch"><div><b>Évals</b><div class="small muted">La veille à 20h et le matin même</div></div><button class="tg" data-pref="evals"></button></div>
+    <div class="switch"><div><b>Évals</b><div class="small muted">À J-7 et J-5 (18h), et le jour même à 7h</div></div><button class="tg" data-pref="evals"></button></div>
     <div class="switch"><div><b>Eau</b><div class="small muted">10h, 13h, 16h, 19h si tu es en retard</div></div><button class="tg" data-pref="water"></button></div>
-    <div class="switch"><div><b>Tâches & agenda</b><div class="small muted">Résumé de la journée à 8h</div></div><button class="tg" data-pref="tasks"></button></div>
+    <div class="switch"><div><b>Tâches & agenda</b><div class="small muted">Ta journée à 7h : 1er cours, salle, tâches</div></div><button class="tg" data-pref="tasks"></button></div>
     <div class="switch"><div><b>Bilan du soir</b><div class="small muted">21h, si rien n'est noté</div></div><button class="tg" data-pref="evening"></button></div>
     <div class="row mt"><button class="btn teal" id="notif-on">Activer sur cet appareil</button><button class="btn sec" id="notif-test">Tester</button></div>
   </div>
