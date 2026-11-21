@@ -151,6 +151,7 @@ s.t-eval{background:var(--coral)}s.t-cours{background:var(--blue)}s.t-perso{back
 @keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 .steps li{margin:0 0 8px 20px}
 code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
+.iconbtn.spin{animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -160,7 +161,7 @@ code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
       <h1 class="hello">Salut <span>Thyvan</span> 👋</h1>
       <div class="sub" id="today-str"></div>
     </div>
-    <button class="iconbtn" id="open-settings" aria-label="Réglages">⚙️<span class="d off" id="sync-dot"></span></button>
+    <div class="row nowrap"><button class="iconbtn" id="refresh" aria-label="Actualiser" title="Actualiser">🔄</button><button class="iconbtn" id="open-settings" aria-label="Réglages">⚙️<span class="d off" id="sync-dot"></span></button></div>
   </div>
 </header>
 
