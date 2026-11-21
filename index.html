@@ -152,6 +152,44 @@ s.t-eval{background:var(--coral)}s.t-cours{background:var(--blue)}s.t-perso{back
 .steps li{margin:0 0 8px 20px}
 code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
 .iconbtn.spin{animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+/* agenda v2 */
+.ecard{display:flex;gap:10px;align-items:flex-start;padding:10px 10px 10px 12px;border-radius:12px;background:#fff;border:1px solid var(--line);border-left:6px solid var(--c);margin-top:8px}
+.ecard .et{width:46px;flex:none;display:flex;flex-direction:column;font-size:13px;line-height:1.2}
+.ecard .et span{color:var(--muted);font-size:12px}
+.ecard .eb{flex:1;min-width:0}
+.ecard .ek{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--c)}
+.ecard .en{font-weight:700;font-size:14px;margin-top:1px}
+.ecard .er{font-weight:800;font-size:14px;margin-top:3px}
+.ecard .ep{font-size:13px;color:var(--muted);margin-top:2px}
+.ecard.lg{padding:14px}
+.ecard.lg .en{font-size:16px}.ecard.lg .er{font-size:17px}.ecard.lg .et{width:56px;font-size:15px}
+.wgrid{display:grid;gap:12px}
+.wday .wh{font-size:14px;font-weight:700;text-transform:capitalize;padding:4px 0;color:var(--ink)}
+.wday.today .wh{color:var(--teal)}
+@media(min-width:1000px){.wgrid{grid-template-columns:repeat(5,1fr)}.ecard{flex-direction:column;gap:4px}.ecard .et{flex-direction:row;gap:6px;width:auto}}
+.mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.mgrid .dn{font-size:11px;font-weight:800;text-align:center;color:var(--muted);padding:4px 0}
+.mc{min-height:64px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px;display:flex;flex-direction:column;align-items:stretch;gap:3px;text-align:left;overflow:hidden}
+.mc .n{font-weight:800;font-size:13px}
+.mc.out{opacity:.35}.mc.today{border:2px solid var(--teal)}.mc.sel{background:var(--teal-soft)}
+.mc .bars{display:flex;flex-direction:column;gap:2px}.mc .bars i{display:block;height:5px;border-radius:3px}
+.mc .mt{display:none}
+@media(min-width:760px){.mc{min-height:96px}.mc .bars{display:none}.mc .mt{display:flex;flex-direction:column;gap:2px}.mc .mt em{font-style:normal;color:#fff;font-size:10.5px;font-weight:700;border-radius:4px;padding:1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;font-size:12px;font-weight:700;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:5px;vertical-align:-1px}
+/* cours du jour */
+#today-courses{margin-bottom:14px}
+.tlist{display:grid;gap:10px;margin-top:12px}
+@media(min-width:900px){.tlist{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}}
+.tc{display:flex;gap:12px;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid var(--line);border-left:7px solid var(--c)}
+.tc.done{opacity:.45}
+.tc.next{box-shadow:0 0 0 2px var(--c) inset;background:#FFFDF8}
+.tc .th{display:flex;flex-direction:column;width:52px;flex:none;font-size:16px;line-height:1.2}
+.tc .th span{color:var(--muted);font-size:13px}
+.tc .tk{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--c)}
+.tc .tn{font-weight:700;font-size:14px;margin-top:1px}
+.tc .troom{font-family:Fraunces,serif;font-size:22px;font-weight:700;margin-top:4px;line-height:1.15}
+.tc .tprof{font-size:15px;font-weight:600;margin-top:3px}
 </style>
 </head>
 <body>
@@ -176,6 +214,7 @@ code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
 <main class="wrap">
 <!-- ACCUEIL -->
 <section class="view on" id="v-home">
+  <div class="card" id="today-courses"></div>
   <div class="grid g2">
     <div class="card hero" id="next-eval"></div>
     <div class="card"><h3>⚠️ À ne pas rater</h3><div id="alerts"></div></div>
@@ -213,24 +252,23 @@ code{background:#EFEAE1;padding:1px 5px;border-radius:5px;font-size:13px}
 
 <!-- AGENDA -->
 <section class="view" id="v-agenda">
-  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-    <div class="card" style="grid-column:span 2;min-width:0">
-      <div class="calhead"><button class="btn sec" id="prev">←</button><h3 id="cal-title" style="margin:0"></h3><button class="btn sec" id="next">→</button></div>
-      <div class="cal" id="cal"></div>
-      <div class="row small" style="margin-top:10px"><span class="tag t-eval">Éval</span><span class="tag t-cours">Cours</span><span class="tag t-perso">Perso</span><span class="tag t-sante">Santé</span><span class="tag t-autre">Autre</span></div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="seg" id="cal-views"><button data-cv="month">Mois</button><button data-cv="week" class="on">Semaine</button><button data-cv="day">Jour</button></div>
+      <button class="btn sec" id="cal-today">Aujourd'hui</button>
     </div>
-    <div class="grid" style="align-content:start">
-      <div class="card"><h3 id="day-title">Jour</h3><div id="day-list"></div></div>
-      <div class="card">
-        <h3>➕ Nouvel événement</h3>
-        <form id="ev-form" class="grid" style="gap:8px">
-          <input id="ev-title" placeholder="Titre (TD bioméca, anniv…)" required>
-          <div class="row nowrap"><input type="date" id="ev-date" required><input type="time" id="ev-time"></div>
-          <select id="ev-type"><option value="cours">Cours / TD</option><option value="eval">Éval</option><option value="perso">Perso</option><option value="sante">Santé / sport</option><option value="autre">Autre</option></select>
-          <button class="btn teal">Ajouter</button>
-        </form>
-      </div>
-    </div>
+    <div class="calhead mt"><button class="btn sec" id="prev" aria-label="Précédent">←</button><h3 id="cal-title" style="margin:0;text-align:center"></h3><button class="btn sec" id="next" aria-label="Suivant">→</button></div>
+    <div id="cal-body"></div>
+    <div class="legend"><span style="--c:#F266CF">PAO</span><span style="--c:#111E93">CM</span><span style="--c:#0F63EE">TD</span><span style="--c:#008080">Clinique</span><span style="--c:#DC2626">Éval</span><span style="--c:#7C3AED">Perso</span></div>
+  </div>
+  <div class="card mt">
+    <h3>➕ Nouvel événement</h3>
+    <form id="ev-form" class="grid" style="gap:8px">
+      <input id="ev-title" placeholder="Titre (padel, anniv, rdv…)" required>
+      <div class="row nowrap"><input type="date" id="ev-date" required><input type="time" id="ev-time"></div>
+      <select id="ev-type"><option value="perso">Perso</option><option value="sante">Santé / sport</option><option value="cours">Cours / TD</option><option value="eval">Éval</option><option value="autre">Autre</option></select>
+      <button class="btn teal">Ajouter</button>
+    </form>
   </div>
 </section>
 
