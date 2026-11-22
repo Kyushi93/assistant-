@@ -520,7 +520,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 
 /* ---------- v9 : objectifs, statistiques, macros, thème ---------- */
 var DEF_GOALS = { water: 2.5, sleep: 8, sport: 4, kcal: 2600, prot: 110 };
-function goals() { return Object.assign({ water: 2.5, sleep: 8, sport: 4, kcal: 2600, prot: 110 }, S.goals || {}); }
+function goals() { return Object.assign({ water: 2.5, sleep: 8, sport: 4, kcal: 2600, prot: 110, study: 60 }, S.goals || {}); }
 function syncGoal() { GOAL = Math.round(goals().water * 1000); const w = document.querySelector(".ring .v .small"); if (w) w.textContent = "/ " + fmtL(GOAL); const hw = $("h-goal"); if (hw) hw.textContent = fmtL(GOAL); }
 
 /* Thème clair / sombre */
@@ -623,9 +623,15 @@ function computeStats(n) {
   const sl = sleep.filter(v => v > 0); const pS = sl.length ? sl.reduce((a, v) => a + Math.min(1, v / G.sleep), 0) / sl.length * 100 : null;
   const sessions = gymDays.reduce((a, v) => a + v, 0); const pSp = Math.min(100, sessions / (G.sport * n / 7) * 100);
   const md = mac.filter(m => m.n); const pN = md.length ? md.reduce((a, m) => a + 0.5 * Math.min(1, m.p / G.prot) + 0.5 * Math.max(0, 1 - Math.abs(m.kcal - G.kcal) / G.kcal), 0) / md.length * 100 : null;
-  const up = upcomingCC().filter(c => diffDays(c.date) <= 21); const pE = up.length ? up.reduce((a, c) => a + (S.rev[c.id] || 0), 0) / up.length : null;
+  const up = upcomingCC().filter(c => diffDays(c.date) <= 21);
+  const study = dd.map(d => +d.study || 0), studyTot = study.reduce((a, v) => a + v, 0);
+  const pRev = Math.min(100, studyTot / (G.study * n) * 100);
+  const prep = up.map(c => { const e = Math.max(10, Math.min(100, (21 - diffDays(c.date)) / 21 * 100)); return Math.min(1, (S.rev[c.id] || 0) / e); });
+  const pPrep = prep.length ? prep.reduce((a, v) => a + v, 0) / prep.length * 100 : null;
+  const tk = S.tasks.filter(t => t.d && t.d >= ds[0] && t.d <= TODAY()); const pT = tk.length ? tk.filter(t => t.done).length / tk.length * 100 : null;
+  const sc = [[pRev, .5], [pPrep, .3], [pT, .2]].filter(x => x[0] != null); const pE = sc.reduce((a, x) => a + x[0] * x[1], 0) / sc.reduce((a, x) => a + x[1], 0);
   const parts = [pW, pS, pSp, pN, pE].filter(v => v != null);
-  return { G, ds, water, sleep, gymDays, mac, pW, pS, pSp, pN, pE, sessions, sl, md, up, global: parts.reduce((a, v) => a + v, 0) / parts.length };
+  return { G, ds, water, sleep, gymDays, mac, pW, pS, pSp, pN, pE, sessions, sl, md, up, study, studyTot, pRev, pPrep, pT, tk, global: parts.reduce((a, v) => a + v, 0) / parts.length };
 }
 function renderStats() {
   if (!window.__v9 || !$("v-stats")) return;
@@ -648,13 +654,95 @@ function renderStats() {
     <div class="lbl" style="margin-top:10px">Calories / jour</div>${barSvg(kc, lab, G.kcal, "#E4572E", v => Math.round(v))}<div class="lbl">Protéines / jour (g)</div>${barSvg(pr, lab, G.prot, "#0F766E", v => Math.round(v))}${st.md.length ? "" : `<p class="small muted">Ajoute tes repas avec la recherche d'aliments (onglet Santé) pour voir tes macros.</p>`}`;
   const wk = monday(TODAY()); let hrs = 0; EDT.filter(r => r[0] >= wk && r[0] <= addD(wk, 6)).forEach(r => { const [a, b] = [r[1], r[2]].map(t => +t.slice(0, 2) + t.slice(3) / 60); hrs += b - a; });
   const done7 = S.tasks.filter(t => t.done).length, todo = S.tasks.filter(t => !t.done).length;
-  $("stat-study").innerHTML = `<h3>📚 Études</h3><div class="kpi"><div><span class="lbl">Cours cette semaine</span><b>${Math.round(hrs)} h</b></div><div><span class="lbl">Tâches faites</span><b>${done7}/${done7 + todo}</b></div><div><span class="lbl">Révisions (3 sem.)</span><b>${st.pE == null ? "—" : Math.round(st.pE) + "%"}</b></div></div>
-    ${st.up.length ? st.up.map(c => `<div class="srow"><span><b>${c.ue}</b> ${esc(c.name)} <small class="muted">${jx(diffDays(c.date))}</small></span><div class="bar"><i style="width:${S.rev[c.id] || 0}%;background:${diffDays(c.date) <= 7 ? "#DC2626" : "var(--teal)"}"></i></div><b>${S.rev[c.id] || 0}%</b></div>`).join("") : `<div class="empty">Pas d'éval dans les 3 prochaines semaines.</div>`}`;
+  const sAvg = st.studyTot / statN;
+  $("stat-study").innerHTML = `<h3>📚 Études <small class="muted" style="font-weight:600">${Math.round(st.pE)}%</small></h3><div class="kpi"><div><span class="lbl">Révisé (${statN} j)</span><b>${fmtMin(st.studyTot)}</b></div><div><span class="lbl">Moyenne / jour</span><b>${fmtMin(sAvg)}</b></div><div><span class="lbl">Cours cette semaine</span><b>${Math.round(hrs)} h</b></div></div>
+    ${barSvg(st.study.map(v => v / 60), lab, G.study / 60, "#C98B12", v => (Math.round(v * 10) / 10) + "h")}
+    <div class="srow2"><span>⏱️ Temps de révision <small class="muted">50 %</small></span><div class="bar"><i style="width:${st.pRev}%;background:#C98B12"></i></div><b>${Math.round(st.pRev)}%</b></div>
+    <div class="srow2"><span>🎯 Préparation des évals <small class="muted">30 %</small></span><div class="bar"><i style="width:${st.pPrep ?? 0}%;background:var(--teal)"></i></div><b>${st.pPrep == null ? "—" : Math.round(st.pPrep) + "%"}</b></div>
+    <div class="srow2"><span>✅ Tâches à l'heure <small class="muted">20 %</small></span><div class="bar"><i style="width:${st.pT ?? 0}%;background:#7C3AED"></i></div><b>${st.pT == null ? "—" : Math.round(st.pT) + "%"}</b></div>
+    <p class="small muted" style="margin-top:8px">Ta note Études = surtout ton temps de révision (note-le dans l'onglet Évals), puis ton avance sur les évals : une éval dans 3 semaines n'attend que 10 % de révision, une éval dans 1 semaine en attend ~70 %. Pas de pénalité pour une éval lointaine.</p>
+    ${st.up.length ? st.up.map(c => `<div class="srow"><span><b>${c.ue}</b> ${esc(c.name)} <small class="muted">${jx(diffDays(c.date))}</small></span><div class="bar"><i style="width:${S.rev[c.id] || 0}%;background:${diffDays(c.date) <= 7 ? "#DC2626" : "var(--teal)"}"></i></div><b>${S.rev[c.id] || 0}%</b></div>`).join("") : ""}`;
   const gi = (k, label, unit, step) => `<label class="goal"><span>${label}</span><input type="number" inputmode="decimal" step="${step}" min="0" data-goal="${k}" value="${G[k]}"><em>${unit}</em></label>`;
   $("stat-goals").innerHTML = `<h3>🎯 Mes objectifs</h3><p class="small muted" style="margin-bottom:8px">Ce sont les cibles qui servent à calculer tes pourcentages. Modifie-les quand tu veux.</p>
-    ${gi("water", "💧 Eau par jour", "L", "0.1")}${gi("sleep", "😴 Sommeil par nuit", "h", "0.5")}${gi("sport", "🏋️ Séances de sport", "/ semaine", "1")}${gi("kcal", "🔥 Calories par jour", "kcal", "50")}${gi("prot", "🥩 Protéines par jour", "g", "5")}
-    <p class="small muted" style="margin-top:8px">Repères : ~35 ml d'eau/kg, 7–9 h de sommeil, 1,6 g de protéines/kg si tu fais de la muscu. Les calories dépendent de ton activité : ajuste selon ta forme.</p>`;
+    ${gi("study", "📚 Révision par jour", "min", "15")}${gi("water", "💧 Eau par jour", "L", "0.1")}${gi("sleep", "😴 Sommeil par nuit", "h", "0.5")}${gi("sport", "🏋️ Séances de sport", "/ semaine", "1")}${gi("kcal", "🔥 Calories par jour", "kcal", "50")}${gi("prot", "🥩 Protéines par jour", "g", "5")}
+    <p class="small muted" style="margin-top:8px">Repères : ~1 h de révision perso/jour en moyenne (le week-end compte aussi), ~35 ml d'eau/kg, 7–9 h de sommeil, 1,6 g de protéines/kg si tu fais de la muscu. Les calories dépendent de ton activité : ajuste selon ta forme.</p>`;
 }
 $("stat-goals").addEventListener("change", e => { const i = e.target.closest("[data-goal]"); if (!i) return; const v = parseFloat(String(i.value).replace(",", ".")); if (!(v > 0)) return; S.goals = Object.assign({}, S.goals || {}, { [i.dataset.goal]: v }); save(); syncGoal(); renderAll(); toast("Objectif mis à jour 🎯"); });
 $("stat-period").onclick = e => { const b = e.target.closest("[data-n]"); if (!b) return; statN = +b.dataset.n; renderStats(); };
 window.__v9 = true; syncGoal(); renderAll();
+
+/* ===== v10 : révisions, fenêtre de statut ===== */
+function fmtMin(m) { m = Math.round(m); return m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? String(m % 60).padStart(2, "0") : "") : m + " min"; }
+function renderStudy() {
+  if (!$("study-card")) return;
+  const d = day(TODAY()), G = goals(), m = +d.study || 0;
+  $("study-today").textContent = fmtMin(m) + " / " + fmtMin(G.study);
+  $("study-bar").style.width = Math.min(100, m / G.study * 100) + "%";
+  const sel = $("study-ue"), cur = sel.value;
+  const ues = []; upcomingCC().forEach(c => { if (!ues.find(u => u[0] === c.ue)) ues.push([c.ue, c.name]); });
+  sel.innerHTML = `<option value="">Révision générale</option>` + ues.map(([u, n]) => `<option value="${esc(u)}">UE ${esc(u)} · ${esc(n)}</option>`).join("");
+  if (cur) sel.value = cur;
+  let wk = 0; for (let k = 0; k < 7; k++) { const x = S.days[addD(monday(TODAY()), k)]; wk += x ? +x.study || 0 : 0; }
+  const per = d.sl ? Object.entries(d.sl).filter(([, v]) => v > 0).map(([u, v]) => (u ? "UE " + u : "Général") + " " + fmtMin(v)).join(" · ") : "";
+  $("study-week").textContent = `Cette semaine : ${fmtMin(wk)} / ${fmtMin(G.study * 7)}` + (per ? ` — Aujourd'hui : ${per}` : "");
+}
+$("study-card") && $("study-card").addEventListener("click", e => {
+  const b = e.target.closest("[data-sm]"); if (!b) return;
+  const d = day(TODAY()), v = +b.dataset.sm, u = $("study-ue").value;
+  d.study = Math.max(0, (+d.study || 0) + v); d.sl = d.sl || {}; d.sl[u] = Math.max(0, (d.sl[u] || 0) + v);
+  save(); renderAll(); toast(v > 0 ? `+${v} min de révision 📚` : "Retiré");
+});
+
+/* Fenêtre de statut : niveau, rang, stats */
+function dayXP(s) {
+  const d = S.days[s]; const G = goals(); let xp = 0;
+  if (d) {
+    xp += Math.min(20, (d.water || 0) / 1000 / G.water * 20);
+    if (+d.sleep) xp += Math.min(20, d.sleep / G.sleep * 20);
+    if (d.gym && d.gym !== "repos") xp += 30;
+    xp += Math.min(90, +d.study || 0);
+    if (dayMacros(d).n >= 2) xp += 10;
+  }
+  xp += Math.min(45, S.tasks.filter(t => t.done && t.d === s).length * 15);
+  return xp;
+}
+function levelInfo() {
+  let xp = 0; const keys = new Set(Object.keys(S.days)); S.tasks.forEach(t => t.done && t.d && keys.add(t.d));
+  keys.forEach(s => { if (s <= TODAY()) xp += dayXP(s); });
+  let lvl = 1, need = 100, rest = xp;
+  while (rest >= need) { rest -= need; lvl++; need = Math.round(need * 1.12); }
+  const rank = lvl >= 50 ? "S" : lvl >= 35 ? "A" : lvl >= 22 ? "B" : lvl >= 12 ? "C" : lvl >= 5 ? "D" : "E";
+  return { xp: Math.round(xp), lvl, rest: Math.round(rest), need, rank };
+}
+function radarSvg(vals) {
+  const N = vals.length, cx = 150, cy = 150, R = 100, pt = (i, f) => { const a = -Math.PI / 2 + i * 2 * Math.PI / N; return [cx + Math.cos(a) * R * f, cy + Math.sin(a) * R * f]; };
+  let s = `<svg viewBox="0 0 300 300"><defs><filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+  [.25, .5, .75, 1].forEach(f => s += `<polygon points="${vals.map((_, i) => pt(i, f).join(",")).join(" ")}" fill="none" stroke="rgba(92,200,255,${f === 1 ? .6 : .2})" stroke-width="1"/>`);
+  vals.forEach((_, i) => { const [x, y] = pt(i, 1); s += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(92,200,255,.2)"/>`; });
+  const poly = vals.map((v, i) => pt(i, Math.max(.04, (v.v || 0) / 100)).join(",")).join(" ");
+  s += `<polygon points="${poly}" fill="rgba(63,169,255,.35)" stroke="#7FDBFF" stroke-width="2" filter="url(#glow)"/>`;
+  vals.forEach((v, i) => { const [x, y] = pt(i, Math.max(.04, (v.v || 0) / 100)); s += `<circle cx="${x}" cy="${y}" r="3.5" fill="#fff" filter="url(#glow)"/>`; const [lx, ly] = pt(i, 1.2); s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#9DD8FF" font-size="13" font-weight="800" letter-spacing="1.5">${v.k}</text>`; });
+  return s + `</svg>`;
+}
+function renderSys() {
+  if (!$("stat-sys")) return;
+  const st = computeStats(statN), L = levelInfo();
+  const ds = lastDays(statN); const reg = ds.filter(s => { const d = S.days[s] || {}; return [d.water > 0, +d.sleep > 0, !!d.gym, +d.study > 0, (d.meals || []).length > 0].filter(Boolean).length >= 2; }).length / statN * 100;
+  const v = [
+    { k: "FOR", n: "Force · sport", v: st.pSp },
+    { k: "AGI", n: "Agilité · régularité", v: reg },
+    { k: "END", n: "Endurance · hydratation", v: st.pW },
+    { k: "VIT", n: "Vitalité · sommeil", v: st.pS },
+    { k: "INT", n: "Intelligence · études", v: st.pE },
+    { k: "SEN", n: "Sens · nutrition", v: st.pN }
+  ];
+  const title = L.lvl >= 35 ? "Maître du corps humain" : L.lvl >= 22 ? "Ostéo d'élite" : L.lvl >= 12 ? "Praticien en devenir" : L.lvl >= 5 ? "Apprenti ostéo" : "Éveillé";
+  $("stat-sys").innerHTML = `<div class="sh"><span>◆ Fenêtre de statut</span><span>${statN} j</span></div>
+    <div class="lvl"><div><div class="kv">Niveau</div><b>${L.lvl}</b></div><div><div class="kv">Rang</div><span class="rank">${L.rank}</span></div><div style="flex:1;min-width:150px"><div class="kv">Nom</div><div style="font-weight:800;font-size:16px;color:#fff">Thyvan Chu</div><div class="kv" style="margin-top:4px">Titre</div><div style="font-weight:700;color:#BFE6FF">${title}</div></div></div>
+    <div class="xp"><i style="width:${L.rest / L.need * 100}%"></i></div><div class="kv" style="display:flex;justify-content:space-between"><span>XP ${L.rest} / ${L.need}</span><span>Total ${L.xp} XP</span></div>
+    <div class="sbody" style="margin-top:12px">${radarSvg(v)}<div class="stl">${v.map(x => `<div><span>${x.k}<small>${x.n}</small></span><b>${x.v == null ? "—" : Math.round(x.v)}</b></div>`).join("")}</div></div>
+    <p class="small muted" style="margin-top:10px">Chaque jour tu gagnes de l'XP : eau (20), sommeil (20), séance de sport (30), 1 XP par minute de révision (max 90), repas notés (10), tâches faites (15 chacune). Rang E → D (niv. 5) → C (12) → B (22) → A (35) → S (50).</p>`;
+}
+{ const _ra = renderAll; renderAll = function () { _ra(); renderStudy(); renderSys(); }; }
+renderStudy(); renderSys();
+$("stat-period") && $("stat-period").addEventListener("click", () => setTimeout(renderSys));
