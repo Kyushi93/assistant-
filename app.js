@@ -763,51 +763,57 @@ function aiErr(e) {
 }
 
 /* Décomposition d'un plat */
-var dishCur = null;
+var dishList = null;
+/* L'IA renvoie plusieurs éléments (ex. bò bún ×2 + nems ×5), chacun pour 1 portion + un nombre */
 async function analyseDish(text) {
   const r = await callAI({ mode: "dish", text });
-  try { await loadFood(); } catch (e) {}
-  const ing = (r.ingredients || []).filter(x => x && x.nom && x.g > 0).map(x => {
-    const nb0 = Math.max(0.5, +r.nb || 1), g1 = Math.max(1, Math.round(+x.g)), g = Math.round(g1 * nb0), ai = { k: (+x.kcal || 0) / g1 * 100, p: (+x.p || 0) / g1 * 100, c: (+x.c || 0) / g1 * 100, f: (+x.f || 0) / g1 * 100 };
-    let per = ai, src = "estimation IA";
-    const m = FOOD ? searchFood(x.nom)[0] : null;
-    if (m && (ai.k < 5 ? m.k < 40 : m.k > ai.k / 3 && m.k < ai.k * 3)) { per = { k: m.k, p: m.p, c: m.c, f: m.f }; src = "Ciqual · " + m.n; }
-    return { nom: x.nom, g, base: g, per, src };
-  });
-  const nb = Math.max(0.5, +r.nb || 1);
-  return { plat: r.plat || text, portion: r.portion || "", nb, n: nb, ing };
+  const els = Array.isArray(r.elements) ? r.elements : (r.ingredients ? [{ plat: r.plat, portion: r.portion, nb: r.nb, ingredients: r.ingredients }] : []);
+  return els.map(el => {
+    let ing = (el.ingredients || []).filter(x => x && x.nom && +x.g > 0).map(x => ({ nom: x.nom, g: Math.round(+x.g), k: +x.kcal || 0, p: +x.p || 0, c: +x.c || 0, f: +x.f || 0 }));
+    const sum = ing.reduce((a, i) => a + i.k, 0), ku = +el.kcal_unite || 0;
+    if (ku > 0 && sum > 0 && Math.abs(sum - ku) / ku > 0.12) { const fct = ku / sum; ing = ing.map(i => ({ ...i, k: i.k * fct, p: i.p * fct, c: i.c * fct, f: i.f * fct })); }
+    return { plat: el.plat || text, portion: el.portion || "", n: Math.max(0.5, Math.round((+el.nb || 1) * 2) / 2), ing };
+  }).filter(D => D.ing.length);
 }
-function dishTot(D) { const t = { kcal: 0, p: 0, c: 0, f: 0, g: 0 }; D.ing.forEach(i => { t.kcal += i.per.k * i.g / 100; t.p += i.per.p * i.g / 100; t.c += i.per.c * i.g / 100; t.f += i.per.f * i.g / 100; t.g += i.g; }); return t; }
+function dishTot(D) { const t = { kcal: 0, p: 0, c: 0, f: 0, g: 0 }; D.ing.forEach(i => { t.kcal += i.k * D.n; t.p += i.p * D.n; t.c += i.c * D.n; t.f += i.f * D.n; t.g += i.g * D.n; }); return t; }
+function listTot() { const t = { kcal: 0, p: 0, c: 0, f: 0 }; (dishList || []).forEach(D => { const x = dishTot(D); t.kcal += x.kcal; t.p += x.p; t.c += x.c; t.f += x.f; }); return t; }
+const nFmt = n => (n % 1 ? n.toFixed(1).replace(".", ",") : n);
+function totHTML(t) { return `<div><b>${Math.round(t.kcal)}</b><span>kcal</span></div><div><b>${Math.round(t.p)} g</b><span>Protéines</span></div><div><b>${Math.round(t.c)} g</b><span>Glucides</span></div><div><b>${Math.round(t.f)} g</b><span>Lipides</span></div>`; }
 function renderDish() {
-  const D = dishCur; if (!D) return; const t = dishTot(D), r1 = v => Math.round(v);
-  const nTxt = (D.n % 1 ? D.n.toFixed(1).replace(".", ",") : D.n);
-  $("food-res").innerHTML = `<div class="aibox"><div class="lbl" style="margin-bottom:4px">✨ ${esc(D.plat)}</div>
-    <div class="pstep"><span class="small muted">${esc(D.portion || "Portion standard")}</span><div><button type="button" data-pn="-0.5" aria-label="Moins">−</button><b>${nTxt}</b><button type="button" data-pn="0.5" aria-label="Plus">+</button></div></div>
-    ${D.ing.map((i, n) => `<div class="aing"><span><b>${esc(i.nom)}</b><small>${esc(i.src)}</small></span><label><input type="number" inputmode="numeric" min="0" value="${i.g}" data-ig="${n}"> g</label><em>${r1(i.per.k * i.g / 100)} kcal</em><button class="x" data-irm="${n}" type="button" aria-label="Retirer">×</button></div>`).join("")}
-    <div class="atot"><div><b>${r1(t.kcal)}</b><span>kcal</span></div><div><b>${r1(t.p)} g</b><span>Protéines</span></div><div><b>${r1(t.c)} g</b><span>Glucides</span></div><div><b>${r1(t.f)} g</b><span>Lipides</span></div></div>
-    <div class="row" style="margin-top:10px"><button class="btn teal" id="dish-add" type="button" style="flex:1">✓ Ajouter le repas</button><button class="btn sec" id="dish-cancel" type="button">Annuler</button></div>
-    <p class="small muted" style="margin-top:6px">Tu peux corriger les grammes ou retirer un ingrédient avant d'ajouter.</p></div>`;
+  if (!dishList || !dishList.length) { $("food-res").innerHTML = ""; return; }
+  $("food-res").innerHTML = `<div class="aibox">${dishList.map((D, d) => { const t = dishTot(D); return `<div class="delt">
+      <div class="dhead"><div><b>${esc(D.plat)}</b><small>${esc(D.portion || "portion standard")} · ${Math.round(t.kcal / D.n)} kcal l'unité</small></div><button class="x" data-drm="${d}" type="button" aria-label="Retirer">×</button></div>
+      <div class="pstep"><span class="small muted">Quantité mangée</span><div><button type="button" data-pn="${d}|-0.5">−</button><b>${nFmt(D.n)}</b><button type="button" data-pn="${d}|0.5">+</button></div><em class="dk">${Math.round(t.kcal)} kcal · ${Math.round(t.p)} g prot</em></div>
+      <details><summary>Ingrédients pour 1 unité</summary>${D.ing.map((i, n) => `<div class="aing"><span><b>${esc(i.nom)}</b></span><label><input type="number" inputmode="numeric" min="0" value="${i.g}" data-ig="${d}|${n}"> g</label><em>${Math.round(i.k)} kcal</em><button class="x" data-irm="${d}|${n}" type="button" aria-label="Retirer">×</button></div>`).join("")}</details>
+    </div>`; }).join("")}
+    <div class="lbl" style="margin-top:10px">Total</div><div class="atot">${totHTML(listTot())}</div>
+    <div class="row" style="margin-top:10px"><button class="btn teal" id="dish-add" type="button" style="flex:1">✓ Ajouter</button><button class="btn sec" id="dish-cancel" type="button">Annuler</button></div>
+    <p class="small muted" style="margin-top:6px">Ajuste la quantité avec − / +, ou ouvre « Ingrédients » pour corriger les grammes.</p></div>`;
 }
 function addDish(D, k) {
   const t = dishTot(D), r = v => Math.round(v * 10) / 10;
-  day(hDate()).meals.push({ k, d: (D.n !== 1 ? (D.n % 1 ? D.n.toFixed(1).replace(".", ",") : D.n) + " × " : "") + D.plat, g: Math.round(t.g), kcal: Math.round(t.kcal), p: r(t.p), c: r(t.c), f: r(t.f), ing: D.ing.map(i => i.nom + " " + i.g + " g").join(", ") });
-  save(); renderSante();
+  day(hDate()).meals.push({ k, d: (D.n !== 1 ? nFmt(D.n) + " × " : "") + D.plat, g: Math.round(t.g), kcal: Math.round(t.kcal), p: r(t.p), c: r(t.c), f: r(t.f), ing: D.ing.map(i => i.nom + " " + i.g + " g").join(", ") });
 }
 const ciqualSearch = $("meal-form").onsubmit;
 $("meal-form").onsubmit = async e => {
   e.preventDefault();
   const raw = $("meal-d").value.trim(); if (!raw) return;
-  $("food-res").innerHTML = `<div class="empty">✨ L'IA décortique ton plat…</div>`;
-  try { dishCur = await analyseDish(raw); if (!dishCur.ing.length) throw new Error("vide"); renderDish(); }
-  catch (err) { dishCur = null; $("food-res").innerHTML = `<div class="empty">${aiErr(err)}</div><div class="row"><button class="btn sec" id="meal-ciq" type="button">🔎 Chercher dans la table Ciqual</button></div>`; }
+  $("food-res").innerHTML = `<div class="empty">✨ L'IA décortique ton repas…</div>`;
+  try { dishList = await analyseDish(raw); if (!dishList.length) throw new Error("vide"); renderDish(); }
+  catch (err) { dishList = null; $("food-res").innerHTML = `<div class="empty">${aiErr(err)}</div><div class="row"><button class="btn sec" id="meal-ciq" type="button">🔎 Chercher dans la table Ciqual</button></div>`; }
 };
 $("meal-search") && ($("meal-search").onclick = () => ciqualSearch({ preventDefault() {} }));
-$("food-res").addEventListener("input", e => { const i = e.target.closest("[data-ig]"); if (!i || !dishCur) return; dishCur.ing[+i.dataset.ig].g = Math.max(0, Math.round(+i.value || 0)); dishCur.ing[+i.dataset.ig].base = dishCur.ing[+i.dataset.ig].g * dishCur.nb / dishCur.n; const t = dishTot(dishCur); const box = $("food-res").querySelector(".atot"); if (box) box.innerHTML = `<div><b>${Math.round(t.kcal)}</b><span>kcal</span></div><div><b>${Math.round(t.p)} g</b><span>Protéines</span></div><div><b>${Math.round(t.c)} g</b><span>Glucides</span></div><div><b>${Math.round(t.f)} g</b><span>Lipides</span></div>`; i.closest(".aing").querySelector("em").textContent = Math.round(dishCur.ing[+i.dataset.ig].per.k * dishCur.ing[+i.dataset.ig].g / 100) + " kcal"; });
+$("food-res").addEventListener("change", e => {
+  const i = e.target.closest("[data-ig]"); if (!i || !dishList) return;
+  const [d, n] = i.dataset.ig.split("|").map(Number), it = dishList[d].ing[n], g = Math.max(0, Math.round(+i.value || 0));
+  if (it.g > 0) { const f = g / it.g; it.k *= f; it.p *= f; it.c *= f; it.f *= f; } it.g = g; renderDish();
+});
 $("food-res").addEventListener("click", e => {
-  const pn = e.target.closest("[data-pn]"); if (pn && dishCur) { dishCur.n = Math.max(0.5, dishCur.n + +pn.dataset.pn); dishCur.ing.forEach(i => i.g = Math.round(i.base * dishCur.n / dishCur.nb)); renderDish(); return; }
-  const rm = e.target.closest("[data-irm]"); if (rm && dishCur) { dishCur.ing.splice(+rm.dataset.irm, 1); renderDish(); return; }
-  if (e.target.id === "dish-add" && dishCur) { addDish(dishCur, $("meal-k").value); dishCur = null; $("meal-d").value = ""; $("food-res").innerHTML = ""; toast("Repas ajouté ✓"); return; }
-  if (e.target.id === "dish-cancel") { dishCur = null; $("food-res").innerHTML = ""; return; }
+  const pn = e.target.closest("[data-pn]"); if (pn && dishList) { const [d, v] = pn.dataset.pn.split("|").map(Number); dishList[d].n = Math.max(0.5, dishList[d].n + v); renderDish(); return; }
+  const rm = e.target.closest("[data-irm]"); if (rm && dishList) { const [d, n] = rm.dataset.irm.split("|").map(Number); dishList[d].ing.splice(n, 1); if (!dishList[d].ing.length) dishList.splice(d, 1); renderDish(); return; }
+  const drm = e.target.closest("[data-drm]"); if (drm && dishList) { dishList.splice(+drm.dataset.drm, 1); renderDish(); return; }
+  if (e.target.id === "dish-add" && dishList) { const k = $("meal-k").value; dishList.forEach(D => addDish(D, k)); save(); renderSante(); dishList = null; $("meal-d").value = ""; $("food-res").innerHTML = ""; toast("Repas ajouté ✓"); return; }
+  if (e.target.id === "dish-cancel") { dishList = null; $("food-res").innerHTML = ""; return; }
   if (e.target.id === "meal-ciq") ciqualSearch({ preventDefault() {} });
 });
 
@@ -837,7 +843,7 @@ async function runActions(acts) {
       else if (a.type === "sleep" && a.h > 0) { d.sleep = String(a.h); done.push("😴 Sommeil : " + a.h + " h"); }
       else if (a.type === "gym" && a.s) { d.gym = a.s; if (a.dur) d.dur = String(a.dur); done.push("🏋️ Séance : " + esc(a.s)); }
       else if (a.type === "study" && a.min > 0) { d.study = (+d.study || 0) + Math.round(a.min); d.sl = d.sl || {}; const u = (a.ue || "").replace(/^UE\s*/i, ""); const key = u ? "UE " + u : ""; d.sl[key] = (d.sl[key] || 0) + Math.round(a.min); done.push("📚 +" + Math.round(a.min) + " min de révision"); }
-      else if (a.type === "meal" && a.text) { const D = await analyseDish(a.text); if (D.ing.length) { const k = ["Petit-déj", "Déjeuner", "Collation", "Dîner"].includes(a.k) ? a.k : (new Date().getHours() < 11 ? "Petit-déj" : new Date().getHours() < 15 ? "Déjeuner" : new Date().getHours() < 18 ? "Collation" : "Dîner"); const t = dishTot(D); addDish(D, k); done.push("🍽️ " + esc(D.plat) + " : " + Math.round(t.kcal) + " kcal · " + Math.round(t.p) + " g prot"); } }
+      else if (a.type === "meal" && a.text) { const L = await analyseDish(a.text); const k = ["Petit-déj", "Déjeuner", "Collation", "Dîner"].includes(a.k) ? a.k : (new Date().getHours() < 11 ? "Petit-déj" : new Date().getHours() < 15 ? "Déjeuner" : new Date().getHours() < 18 ? "Collation" : "Dîner"); L.forEach(D => { const t = dishTot(D); addDish(D, k); done.push("🍽️ " + (D.n !== 1 ? nFmt(D.n) + " × " : "") + esc(D.plat) + " : " + Math.round(t.kcal) + " kcal · " + Math.round(t.p) + " g prot"); }); }
     } catch (e) {}
   }
   if (done.length) { save(); renderAll(); }
@@ -860,7 +866,7 @@ async function sendChat(text) {
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v19</small></h2><button class="btn sec" data-close>Fermer</button></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v20</small></h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Bonjour boss. Touchez le micro et parlez-moi : planning, évals, révisions… ou dites-moi ce que vous avez mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
     <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
