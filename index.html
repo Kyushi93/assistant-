@@ -294,6 +294,16 @@ nav.bottom button{min-width:0}
 .jv{font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;text-align:center}.jv input{width:auto}
 #ai-mic.rec{box-shadow:0 0 0 calc(var(--lv,0) * 22px) rgba(220,38,38,.28),0 8px 24px rgba(220,38,38,.35);animation:none;transition:box-shadow .1s}
 .vsel{gap:6px;width:100%;max-width:420px}.vsel select{flex:1;min-width:0;font-size:13px;padding:8px}.vsel .btn{flex:none;padding:8px 12px;font-size:13px}
+.wsums{display:grid;gap:10px}
+.wsum .ws-h{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-weight:700}.wsum .ws-h b{font-family:Fraunces,serif;font-size:18px}
+.wsum .bar{margin:5px 0 3px}.wsum small{color:var(--muted);font-size:12px}
+.wkt{width:100%;border-collapse:separate;border-spacing:3px;font-size:12.5px;text-align:center}
+.wkt th{font-weight:700;color:var(--muted);font-size:11.5px;padding:2px}.wkt tbody th{text-align:left;color:var(--ink);font-size:13px;white-space:nowrap}.wkt tbody th small{color:var(--muted);margin-left:3px;font-weight:600}
+.wkt td{border-radius:8px;padding:7px 3px;font-weight:700;white-space:nowrap}
+.wkt td.ok{background:rgba(16,185,129,.16);color:#047857}.wkt td.ko{background:rgba(239,68,68,.12);color:#B91C1C}.wkt td.na{color:var(--muted);opacity:.6}
+.wkt td.wbar{position:relative;background:var(--bg);overflow:hidden;min-width:64px}.wkt td.wbar i{position:absolute;left:0;top:0;bottom:0;background:rgba(37,99,235,.22)}.wkt td.wbar.ok i{background:rgba(16,185,129,.3)}.wkt td.wbar span{position:relative}
+.wkt tr.today th{color:var(--teal)}
+[data-theme=dark] .wkt td.ok{color:#6EE7B7}[data-theme=dark] .wkt td.ko{color:#FCA5A5}
 /* Barre du bas flottante (mobile) */
 @media(max-width:899px){
   nav.bottom{position:fixed!important;left:12px;right:12px;bottom:calc(max(var(--sb) - 18px, 8px));order:0;padding:6px;border:1px solid var(--line);border-radius:26px;box-shadow:0 10px 30px rgba(22,33,31,.18),0 2px 8px rgba(22,33,31,.08);background:rgba(255,255,255,.88)}
@@ -455,12 +465,9 @@ nav.bottom button{min-width:0}
       <p class="small muted" style="margin-top:8px">✨ = l'IA décortique ton plat entier · 🔎 = un aliment précis (avec les grammes). Valeurs : table Ciqual (ANSES), Open Food Facts.</p>
     </div>
     <div class="card">
-      <h3>📈 7 derniers jours</h3>
-      <div class="lbl">Eau (L)</div>
-      <div class="chart" id="w-chart"></div>
-      <div class="lbl" style="margin-top:12px">Salle</div>
-      <div class="gymweek" style="margin-top:6px" id="gymweek"></div>
-      <div class="kpi" style="margin-top:12px" id="week-kpi"></div>
+      <h3>📅 Ma semaine <small class="muted" style="font-weight:600;font-size:13px">7 derniers jours</small></h3>
+      <div class="wsums" id="wk-sum"></div>
+      <div id="wk-table" style="margin-top:12px;overflow-x:auto"></div>
     </div>
   </div>
 </section>
