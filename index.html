@@ -307,6 +307,12 @@ nav.bottom button{min-width:0}
 .delt{padding:8px 0 10px;border-bottom:1px solid var(--line)}.dhead{display:flex;justify-content:space-between;gap:8px}.dhead b{font-size:15px}.dhead small{display:block;color:var(--muted);font-size:12px}
 .delt .pstep{border:0;padding:6px 0 2px;flex-wrap:wrap}.delt .dk{font-style:normal;font-weight:700;font-size:13px;width:100%;text-align:right;color:var(--teal)}
 .delt details summary{font-size:12.5px;color:var(--muted);cursor:pointer;margin-top:4px}
+.mstat{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-size:14px}.mstat b{font-size:15px}.mstat em{font-style:normal;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+.mstat em.ok{background:rgba(16,185,129,.16);color:#047857}.mstat em.lo{background:rgba(245,158,11,.18);color:#B45309}.mstat em.hi{background:rgba(239,68,68,.14);color:#B91C1C}
+[data-theme=dark] .mstat em.ok{color:#6EE7B7}[data-theme=dark] .mstat em.lo{color:#FCD34D}[data-theme=dark] .mstat em.hi{color:#FCA5A5}
+.mbar{position:relative;height:9px;border-radius:6px;background:var(--bg);margin-top:5px;overflow:visible}.mbar i{display:block;height:100%;border-radius:6px}.mbar s{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.45;border-radius:2px}
+.mtips{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:13.5px;line-height:1.45}.mtips div+div{margin-top:4px}
+.bulk{border:1px solid var(--line);border-radius:14px;padding:12px}.bulk h4{margin:0 0 6px;font-size:15px}.bphase{display:flex;gap:6px;margin:8px 0}.bphase div{flex:1;border-radius:10px;padding:7px;font-size:12px;background:var(--bg)}.bphase div.on{outline:2px solid var(--teal)}.bphase b{display:block;font-size:13px}
 /* Barre du bas flottante (mobile) */
 @media(max-width:899px){
   nav.bottom{position:fixed!important;left:12px;right:12px;bottom:calc(max(var(--sb) - 18px, 8px));order:0;padding:6px;border:1px solid var(--line);border-radius:26px;box-shadow:0 10px 30px rgba(22,33,31,.18),0 2px 8px rgba(22,33,31,.08);background:rgba(255,255,255,.88)}
@@ -449,8 +455,9 @@ nav.bottom button{min-width:0}
       <div class="row nowrap" style="margin-top:10px"><input type="number" inputmode="numeric" min="0" step="5" placeholder="Durée (min)" id="gym-dur" style="width:130px"><input placeholder="Notes (charges, PR…)" id="gym-note"></div>
     </div>
     <div class="card">
-      <h3>😴 Sommeil & forme</h3>
+      <h3>😴 Sommeil, poids & forme</h3>
       <div class="row nowrap"><span class="lbl" style="width:70px">Sommeil</span><input type="number" inputmode="decimal" min="0" max="14" step="0.5" id="sleep" placeholder="heures" style="width:110px"></div>
+      <div class="row nowrap" style="margin-top:10px"><span class="lbl" style="width:70px">Poids</span><input type="number" inputmode="decimal" min="30" max="250" step="0.1" id="weight" placeholder="kg, le matin à jeun" style="width:170px"></div>
       <div class="row nowrap" style="margin-top:10px"><span class="lbl" style="width:70px">Énergie</span><div class="stars" id="energy"></div></div>
       <div class="row nowrap" style="margin-top:10px"><span class="lbl" style="width:70px">Humeur</span><div class="seg" id="mood"></div></div>
     </div>
@@ -459,6 +466,7 @@ nav.bottom button{min-width:0}
     <div class="card">
       <h3>🍽️ Repas & macros</h3>
       <div id="macro-tot" class="macro"></div>
+      <div id="bulk-card" style="margin-top:14px"></div>
       <div id="meals"></div>
       <form id="meal-form" class="grid" style="gap:8px;margin-top:12px">
         <div class="row nowrap"><select id="meal-k" style="width:120px"><option>Petit-déj</option><option>Déjeuner</option><option>Collation</option><option>Dîner</option></select><input id="meal-g" type="number" inputmode="numeric" min="1" value="150" style="width:90px" aria-label="Quantité en grammes"><span class="small muted">grammes</span></div>
