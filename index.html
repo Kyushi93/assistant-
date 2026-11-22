@@ -249,27 +249,13 @@ nav.bottom button{min-width:0}
 [data-theme=dark] .p-gold{color:#F1C565}[data-theme=dark] .p-teal{color:#5FD1C2}[data-theme=dark] .p-blue{color:#8FB0FF}[data-theme=dark] .p-violet{color:#BFA4FF}[data-theme=dark] .p-coral{color:#FF9B7E}
 [data-theme=dark] .alert{color:var(--ink)}
 [data-theme=dark] .tc.next{background:#1B2422}
-[data-theme=dark] .ecard .ek,[data-theme=dark] .tc .tk{filter:brightness(1.6)}
 [data-theme=dark] .chk{border-color:#4A5753}
 [data-theme=dark] .ecard,[data-theme=dark] .tc{border-left-color:var(--c)}
 .srow2{display:grid;grid-template-columns:1fr 80px 40px;gap:8px;align-items:center;padding:5px 0;font-size:13px}
-.sys{background:radial-gradient(120% 90% at 50% 0%,#14306B 0%,#0A1330 60%,#070C1F 100%)!important;border:1px solid #3FA9FF!important;box-shadow:0 0 0 1px rgba(63,169,255,.25),0 0 24px rgba(63,169,255,.35),inset 0 0 30px rgba(63,169,255,.12);color:#DCEBFF}
-.sys .sh{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(92,200,255,.4);padding-bottom:8px;margin-bottom:10px;letter-spacing:.18em;text-transform:uppercase;font-size:12px;font-weight:800;color:#8FD3FF}
-.sys .lvl{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
-.sys .lvl b{font-family:Fraunces,serif;font-size:46px;line-height:.9;color:#fff;text-shadow:0 0 14px #3FA9FF}
-.sys .rank{font-family:Fraunces,serif;font-size:30px;font-weight:800;color:#FFD86B;text-shadow:0 0 12px rgba(255,200,80,.7);border:1px solid rgba(255,216,107,.6);border-radius:10px;padding:0 10px}
-.sys .kv{font-size:12px;color:#9DB8E0;text-transform:uppercase;letter-spacing:.1em}
-.sys .xp{height:8px;border-radius:6px;background:rgba(63,169,255,.15);overflow:hidden;margin:10px 0 4px;border:1px solid rgba(63,169,255,.35)}
-.sys .xp i{display:block;height:100%;background:linear-gradient(90deg,#3FA9FF,#9BE7FF);box-shadow:0 0 10px #3FA9FF}
-.sys .sbody{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;align-items:center}
-@media(max-width:600px){.sys .sbody{grid-template-columns:1fr}}
-.sys svg{width:100%;height:auto;display:block}
-.sys .stl{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px}
-.sys .stl div{display:flex;justify-content:space-between;border-bottom:1px dashed rgba(92,200,255,.25);padding:4px 0;font-size:14px}
-.sys .stl span{color:#9DB8E0;font-weight:700;letter-spacing:.08em}
-.sys .stl b{color:#fff;font-family:Fraunces,serif;font-size:18px}
-.sys .stl small{display:block;color:#6F8BB5;font-size:10.5px;letter-spacing:0;font-weight:600}
-.sys .muted{color:#7F9CC7!important}
+.radar{width:100%;max-width:420px;display:block;margin:4px auto 0}
+.radar .rgrid{fill:none;stroke:var(--line);stroke-width:1}
+.radar .rl{font-size:13px;font-weight:700;fill:var(--ink)}
+.radar .rv{font-size:13px;font-weight:800}
 #study-card .sbtn{display:flex;gap:6px;flex-wrap:wrap}
 #study-card .big{font-family:Fraunces,serif;font-size:26px}
 [data-theme=dark] .stars button{color:#3A4643}[data-theme=dark] .stars button.on{color:var(--gold)}
@@ -341,7 +327,7 @@ nav.bottom button{min-width:0}
     </div>
     <div class="calhead mt"><button class="btn sec" id="prev" aria-label="Précédent">←</button><h3 id="cal-title" style="margin:0;text-align:center"></h3><button class="btn sec" id="next" aria-label="Suivant">→</button></div>
     <div id="cal-body"></div>
-    <div class="legend"><span style="--c:#F266CF">PAO</span><span style="--c:#111E93">CM</span><span style="--c:#0F63EE">TD</span><span style="--c:#008080">Clinique</span><span style="--c:#DC2626">Éval</span><span style="--c:#7C3AED">Perso</span></div>
+    <div class="legend"><span data-k="pao" style="--c:#F266CF">PAO</span><span data-k="cm" style="--c:#111E93">CM</span><span data-k="td" style="--c:#0F63EE">TD</span><span data-k="clin" style="--c:#008080">Clinique</span><span data-k="eval" style="--c:#DC2626">Éval</span><span data-k="perso" style="--c:#7C3AED">Perso</span></div>
   </div>
   <div class="card mt">
     <h3>➕ Nouvel événement</h3>
@@ -444,7 +430,7 @@ nav.bottom button{min-width:0}
 <section class="view" id="v-stats">
   <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:24px">📊 Mes stats</h2><div class="seg" id="stat-period"><button data-n="7" class="on">7 jours</button><button data-n="30">30 jours</button></div></div>
   <div class="card" id="stat-global"></div>
-  <div class="card sys mt" id="stat-sys"></div>
+  <div class="card mt" id="stat-sys"></div>
   <div class="grid g2 mt">
     <div class="card" id="stat-water"></div>
     <div class="card" id="stat-sleep"></div>
