@@ -860,7 +860,7 @@ async function sendChat(text) {
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v18</small></h2><button class="btn sec" data-close>Fermer</button></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v19</small></h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Bonjour boss. Touchez le micro et parlez-moi : planning, évals, révisions… ou dites-moi ce que vous avez mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
     <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
@@ -886,7 +886,7 @@ function pickVoice() {
   const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
   return v.find(x => /thomas|daniel|nicolas|henri|paul/i.test(x.name)) || v.find(x => /fr-FR/i.test(x.lang)) || v[0] || null;
 }
-const VOICES = { auto: ["auto", "Jarvis HD (meilleure voix dispo)"], pierre: ["ref:pierre", "Pierre · français, posé"], tom: ["ref:tom", "Tom · français, plus jeune"], device: ["", "Voix du téléphone (hors ligne)"] };
+const VOICES = { auto: ["auto", "Rémy · naturel (recommandé)"], henri: ["az:fr-FR-HenriNeural", "Henri · posé"], lucien: ["az:fr-FR-LucienMultilingualNeural", "Lucien · grave"], pierre: ["ref:pierre", "Pierre · voix de secours"], device: ["", "Voix du téléphone (hors ligne)"] };
 function voiceKey() { try { const v = localStorage.getItem("thy-vsel"); return VOICES[v] ? v : "auto"; } catch (e) { return "auto"; } }
 function bargeOn() { try { return localStorage.getItem("thy-barge") !== "0"; } catch (e) { return true; } }
 var aiAudio = new Audio(), spkTok = 0, bargeStream = null, bargeTimer = null, bargeCtx = null;
