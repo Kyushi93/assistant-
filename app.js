@@ -753,14 +753,17 @@ async function analyseDish(text) {
     let per = ai, src = "estimation IA";
     const m = FOOD ? searchFood(x.nom)[0] : null;
     if (m && (ai.k < 5 ? m.k < 40 : m.k > ai.k / 3 && m.k < ai.k * 3)) { per = { k: m.k, p: m.p, c: m.c, f: m.f }; src = "Ciqual · " + m.n; }
-    return { nom: x.nom, g, per, src };
+    return { nom: x.nom, g, base: g, per, src };
   });
-  return { plat: r.plat || text, ing };
+  const nb = Math.max(0.5, +r.nb || 1);
+  return { plat: r.plat || text, portion: r.portion || "", nb, n: nb, ing };
 }
 function dishTot(D) { const t = { kcal: 0, p: 0, c: 0, f: 0, g: 0 }; D.ing.forEach(i => { t.kcal += i.per.k * i.g / 100; t.p += i.per.p * i.g / 100; t.c += i.per.c * i.g / 100; t.f += i.per.f * i.g / 100; t.g += i.g; }); return t; }
 function renderDish() {
   const D = dishCur; if (!D) return; const t = dishTot(D), r1 = v => Math.round(v);
-  $("food-res").innerHTML = `<div class="aibox"><div class="lbl" style="margin-bottom:6px">✨ ${esc(D.plat)}</div>
+  const nTxt = (D.n % 1 ? D.n.toFixed(1).replace(".", ",") : D.n);
+  $("food-res").innerHTML = `<div class="aibox"><div class="lbl" style="margin-bottom:4px">✨ ${esc(D.plat)}</div>
+    <div class="pstep"><span class="small muted">${esc(D.portion || "Portion standard")}</span><div><button type="button" data-pn="-0.5" aria-label="Moins">−</button><b>${nTxt}</b><button type="button" data-pn="0.5" aria-label="Plus">+</button></div></div>
     ${D.ing.map((i, n) => `<div class="aing"><span><b>${esc(i.nom)}</b><small>${esc(i.src)}</small></span><label><input type="number" inputmode="numeric" min="0" value="${i.g}" data-ig="${n}"> g</label><em>${r1(i.per.k * i.g / 100)} kcal</em><button class="x" data-irm="${n}" type="button" aria-label="Retirer">×</button></div>`).join("")}
     <div class="atot"><div><b>${r1(t.kcal)}</b><span>kcal</span></div><div><b>${r1(t.p)} g</b><span>Protéines</span></div><div><b>${r1(t.c)} g</b><span>Glucides</span></div><div><b>${r1(t.f)} g</b><span>Lipides</span></div></div>
     <div class="row" style="margin-top:10px"><button class="btn teal" id="dish-add" type="button" style="flex:1">✓ Ajouter le repas</button><button class="btn sec" id="dish-cancel" type="button">Annuler</button></div>
@@ -768,7 +771,7 @@ function renderDish() {
 }
 function addDish(D, k) {
   const t = dishTot(D), r = v => Math.round(v * 10) / 10;
-  day(hDate()).meals.push({ k, d: D.plat, g: Math.round(t.g), kcal: Math.round(t.kcal), p: r(t.p), c: r(t.c), f: r(t.f), ing: D.ing.map(i => i.nom + " " + i.g + " g").join(", ") });
+  day(hDate()).meals.push({ k, d: (D.n !== 1 ? (D.n % 1 ? D.n.toFixed(1).replace(".", ",") : D.n) + " × " : "") + D.plat, g: Math.round(t.g), kcal: Math.round(t.kcal), p: r(t.p), c: r(t.c), f: r(t.f), ing: D.ing.map(i => i.nom + " " + i.g + " g").join(", ") });
   save(); renderSante();
 }
 const ciqualSearch = $("meal-form").onsubmit;
@@ -780,8 +783,9 @@ $("meal-form").onsubmit = async e => {
   catch (err) { dishCur = null; $("food-res").innerHTML = `<div class="empty">${aiErr(err)}</div><div class="row"><button class="btn sec" id="meal-ciq" type="button">🔎 Chercher dans la table Ciqual</button></div>`; }
 };
 $("meal-search") && ($("meal-search").onclick = () => ciqualSearch({ preventDefault() {} }));
-$("food-res").addEventListener("input", e => { const i = e.target.closest("[data-ig]"); if (!i || !dishCur) return; dishCur.ing[+i.dataset.ig].g = Math.max(0, Math.round(+i.value || 0)); const t = dishTot(dishCur); const box = $("food-res").querySelector(".atot"); if (box) box.innerHTML = `<div><b>${Math.round(t.kcal)}</b><span>kcal</span></div><div><b>${Math.round(t.p)} g</b><span>Protéines</span></div><div><b>${Math.round(t.c)} g</b><span>Glucides</span></div><div><b>${Math.round(t.f)} g</b><span>Lipides</span></div>`; i.closest(".aing").querySelector("em").textContent = Math.round(dishCur.ing[+i.dataset.ig].per.k * dishCur.ing[+i.dataset.ig].g / 100) + " kcal"; });
+$("food-res").addEventListener("input", e => { const i = e.target.closest("[data-ig]"); if (!i || !dishCur) return; dishCur.ing[+i.dataset.ig].g = Math.max(0, Math.round(+i.value || 0)); dishCur.ing[+i.dataset.ig].base = dishCur.ing[+i.dataset.ig].g * dishCur.nb / dishCur.n; const t = dishTot(dishCur); const box = $("food-res").querySelector(".atot"); if (box) box.innerHTML = `<div><b>${Math.round(t.kcal)}</b><span>kcal</span></div><div><b>${Math.round(t.p)} g</b><span>Protéines</span></div><div><b>${Math.round(t.c)} g</b><span>Glucides</span></div><div><b>${Math.round(t.f)} g</b><span>Lipides</span></div>`; i.closest(".aing").querySelector("em").textContent = Math.round(dishCur.ing[+i.dataset.ig].per.k * dishCur.ing[+i.dataset.ig].g / 100) + " kcal"; });
 $("food-res").addEventListener("click", e => {
+  const pn = e.target.closest("[data-pn]"); if (pn && dishCur) { dishCur.n = Math.max(0.5, dishCur.n + +pn.dataset.pn); dishCur.ing.forEach(i => i.g = Math.round(i.base * dishCur.n / dishCur.nb)); renderDish(); return; }
   const rm = e.target.closest("[data-irm]"); if (rm && dishCur) { dishCur.ing.splice(+rm.dataset.irm, 1); renderDish(); return; }
   if (e.target.id === "dish-add" && dishCur) { addDish(dishCur, $("meal-k").value); dishCur = null; $("meal-d").value = ""; $("food-res").innerHTML = ""; toast("Repas ajouté ✓"); return; }
   if (e.target.id === "dish-cancel") { dishCur = null; $("food-res").innerHTML = ""; return; }
@@ -830,19 +834,102 @@ async function sendChat(text) {
     w.innerHTML = esc(r.reply || "…").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
     const done = await runActions(r.actions);
     if (done.length) chatAdd("act", done.join("<br>"));
-  } catch (e) { w.innerHTML = aiErr(e); }
+    if (voiceOn()) speak(r.reply || "", () => { if (convo && $("ai-sheet").classList.contains("on")) listen(); });
+  } catch (e) { w.innerHTML = aiErr(e); if (voiceOn()) speak(aiErr(e)); convo = false; setMic(""); }
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
   sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Assistant</h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Salut Thyvan ! Pose-moi une question sur ton planning, tes évals, ou dis-moi ce que tu as mangé, bu, révisé… je le note pour toi.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
-    <form id="ai-form" class="row nowrap"><input id="ai-in" placeholder="Écris ou dicte ta question…" autocomplete="off"><button class="btn teal">➤</button></form></div>`;
+    <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label></div>
+    <form id="ai-form" class="row nowrap"><input id="ai-in" placeholder="Ou écris ta question…" autocomplete="off"><button class="btn teal">➤</button></form></div>`;
   document.body.appendChild(sh);
-  sh.onclick = e => { if (e.target === sh || e.target.closest("[data-close]")) sh.classList.remove("on"); };
+  sh.onclick = e => { if (e.target === sh || e.target.closest("[data-close]")) { sh.classList.remove("on"); convo = false; stopListen(true); try { speechSynthesis.cancel(); } catch (er) {} } };
   $("ai-form").onsubmit = e => { e.preventDefault(); sendChat($("ai-in").value); };
   $("ai-chips").onclick = e => { const b = e.target.closest("button"); if (b) sendChat(b.textContent); };
   const btn = document.createElement("button"); btn.className = "iconbtn"; btn.id = "open-ai"; btn.setAttribute("aria-label", "Assistant IA"); btn.textContent = "🤖";
   $("refresh").parentNode.insertBefore(btn, $("refresh"));
   btn.onclick = () => { sh.classList.add("on"); setTimeout(() => $("ai-in").focus(), 250); };
+})();
+
+/* ===== v14 : voix (Jarvis) ===== */
+var convo = false, rec = null, recStream = null, recCtx = null, recTimer = null, recCancel = false;
+function voiceOn() { try { return localStorage.getItem("thy-voice") !== "0"; } catch (e) { return true; } }
+function setMic(state, label) {
+  const b = $("ai-mic"); if (!b) return;
+  b.className = state || "";
+  $("ai-mic-lbl").textContent = label || (state === "rec" ? "Je t'écoute… (touche pour arrêter)" : state === "busy" ? "Je réfléchis…" : state === "talk" ? "Je parle… (touche pour couper)" : "Touche pour parler");
+}
+function pickVoice() {
+  const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
+  return v.find(x => /thomas|daniel|nicolas|henri|paul/i.test(x.name)) || v.find(x => /fr-FR/i.test(x.lang)) || v[0] || null;
+}
+function speak(text, after) {
+  try {
+    speechSynthesis.cancel();
+    const clean = String(text).replace(/\*\*/g, "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").trim();
+    if (!clean) { after && after(); return; }
+    const u = new SpeechSynthesisUtterance(clean); u.lang = "fr-FR"; u.rate = 1.05; const v = pickVoice(); if (v) u.voice = v;
+    u.onend = () => { setMic(""); after && after(); }; u.onerror = () => { setMic(""); };
+    setMic("talk"); speechSynthesis.speak(u);
+  } catch (e) { after && after(); }
+}
+function blobToB64(b) { return new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.readAsDataURL(b); }); }
+function stopListen(cancel) {
+  recCancel = !!cancel; clearInterval(recTimer);
+  try { if (rec && rec.state !== "inactive") rec.stop(); } catch (e) {}
+  if (cancel) { try { recStream && recStream.getTracks().forEach(t => t.stop()); } catch (e) {} setMic(""); }
+}
+async function listen() {
+  if (rec && rec.state === "recording") return;
+  if (!navigator.mediaDevices || !window.MediaRecorder) { setMic("", "Micro non disponible ici : utilise la dictée du clavier 🎤"); return; }
+  try { recStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch (e) { setMic("", "Autorise le micro pour me parler (réglages du navigateur)."); convo = false; return; }
+  const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"].find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+  rec = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined);
+  const chunks = []; recCancel = false;
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop = async () => {
+    try { recStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    try { recCtx && recCtx.close(); } catch (e) {}
+    if (recCancel || !chunks.length) { setMic(""); return; }
+    const blob = new Blob(chunks, { type: rec.mimeType || mime || "audio/webm" });
+    if (blob.size < 2500) { setMic(""); convo = false; return; }
+    setMic("busy", "Je transcris…");
+    try {
+      const r = await callAI({ mode: "stt", audio: await blobToB64(blob), mime: blob.type });
+      const t = (r.text || "").trim();
+      if (!t) { setMic("", "Je n'ai rien entendu, réessaie 🙂"); convo = false; return; }
+      if (/^(stop|merci,? c'est tout|c'est bon merci|au revoir)[.!]?$/i.test(t)) { chatAdd("me", esc(t)); convo = false; speak("Avec plaisir, à plus Thyvan !"); return; }
+      setMic("busy"); await sendChat(t); if (!voiceOn()) setMic("");
+    } catch (e) { setMic("", aiErr(e)); convo = false; }
+  };
+  rec.start(250); setMic("rec");
+  // détection de silence : arrêt auto quand tu as fini de parler
+  try {
+    recCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = recCtx.createMediaStreamSource(recStream), an = recCtx.createAnalyser(); an.fftSize = 1024; src.connect(an);
+    const buf = new Float32Array(an.fftSize); let floor = 0, n = 0, spoke = false, quiet = 0; const t0 = Date.now();
+    recTimer = setInterval(() => {
+      an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; const rms = Math.sqrt(s / buf.length);
+      const el = Date.now() - t0;
+      if (el < 400) { floor += rms; n++; return; }
+      const th = Math.max(0.015, (floor / Math.max(1, n)) * 2.8);
+      if (rms > th) { spoke = true; quiet = 0; } else quiet += 100;
+      if ((spoke && quiet >= 1400) || el > 30000 || (!spoke && el > 8000)) { if (!spoke) recCancel = true; stopListen(false); if (!spoke) { setMic("", "Je n'ai rien entendu 🙂"); convo = false; } }
+    }, 100);
+  } catch (e) {}
+}
+(function () {
+  const cb = $("ai-voice"); if (cb) { cb.checked = voiceOn(); cb.onchange = () => { try { localStorage.setItem("thy-voice", cb.checked ? "1" : "0"); } catch (e) {} if (!cb.checked) { convo = false; try { speechSynthesis.cancel(); } catch (e) {} } }; }
+  const b = $("ai-mic"); if (!b) return;
+  b.onclick = () => {
+    try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {}
+    if (b.classList.contains("talk")) { try { speechSynthesis.cancel(); } catch (e) {} convo = false; setMic(""); return; }
+    if (rec && rec.state === "recording") { stopListen(false); return; }
+    if (b.classList.contains("busy")) return;
+    convo = voiceOn(); listen();
+  };
+  try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices(); } catch (e) {}
 })();
