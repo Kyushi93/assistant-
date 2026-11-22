@@ -251,6 +251,27 @@ nav.bottom button{min-width:0}
 [data-theme=dark] .tc.next{background:#1B2422}
 [data-theme=dark] .ecard .ek,[data-theme=dark] .tc .tk{filter:brightness(1.6)}
 [data-theme=dark] .chk{border-color:#4A5753}
+[data-theme=dark] .ecard,[data-theme=dark] .tc{border-left-color:var(--c)}
+.srow2{display:grid;grid-template-columns:1fr 80px 40px;gap:8px;align-items:center;padding:5px 0;font-size:13px}
+.sys{background:radial-gradient(120% 90% at 50% 0%,#14306B 0%,#0A1330 60%,#070C1F 100%)!important;border:1px solid #3FA9FF!important;box-shadow:0 0 0 1px rgba(63,169,255,.25),0 0 24px rgba(63,169,255,.35),inset 0 0 30px rgba(63,169,255,.12);color:#DCEBFF}
+.sys .sh{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(92,200,255,.4);padding-bottom:8px;margin-bottom:10px;letter-spacing:.18em;text-transform:uppercase;font-size:12px;font-weight:800;color:#8FD3FF}
+.sys .lvl{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.sys .lvl b{font-family:Fraunces,serif;font-size:46px;line-height:.9;color:#fff;text-shadow:0 0 14px #3FA9FF}
+.sys .rank{font-family:Fraunces,serif;font-size:30px;font-weight:800;color:#FFD86B;text-shadow:0 0 12px rgba(255,200,80,.7);border:1px solid rgba(255,216,107,.6);border-radius:10px;padding:0 10px}
+.sys .kv{font-size:12px;color:#9DB8E0;text-transform:uppercase;letter-spacing:.1em}
+.sys .xp{height:8px;border-radius:6px;background:rgba(63,169,255,.15);overflow:hidden;margin:10px 0 4px;border:1px solid rgba(63,169,255,.35)}
+.sys .xp i{display:block;height:100%;background:linear-gradient(90deg,#3FA9FF,#9BE7FF);box-shadow:0 0 10px #3FA9FF}
+.sys .sbody{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;align-items:center}
+@media(max-width:600px){.sys .sbody{grid-template-columns:1fr}}
+.sys svg{width:100%;height:auto;display:block}
+.sys .stl{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px}
+.sys .stl div{display:flex;justify-content:space-between;border-bottom:1px dashed rgba(92,200,255,.25);padding:4px 0;font-size:14px}
+.sys .stl span{color:#9DB8E0;font-weight:700;letter-spacing:.08em}
+.sys .stl b{color:#fff;font-family:Fraunces,serif;font-size:18px}
+.sys .stl small{display:block;color:#6F8BB5;font-size:10.5px;letter-spacing:0;font-weight:600}
+.sys .muted{color:#7F9CC7!important}
+#study-card .sbtn{display:flex;gap:6px;flex-wrap:wrap}
+#study-card .big{font-family:Fraunces,serif;font-size:26px}
 [data-theme=dark] .stars button{color:#3A4643}[data-theme=dark] .stars button.on{color:var(--gold)}
 [data-theme=dark] .hero{background:linear-gradient(135deg,#132B27 0%,#0F3A33 100%)}
 [data-theme=dark] .sheet{background:rgba(0,0,0,.6)}
@@ -336,6 +357,13 @@ nav.bottom button{min-width:0}
 <!-- EVALS -->
 <section class="view" id="v-evals">
   <div class="grid g2">
+    <div class="card" id="study-card" style="grid-column:1/-1">
+      <div class="row" style="justify-content:space-between"><h3 style="margin:0">⏱️ Révisions d'aujourd'hui</h3><span class="big" id="study-today">0 min</span></div>
+      <div class="bar" style="margin:10px 0"><i id="study-bar" style="width:0;background:#C98B12"></i></div>
+      <div class="row"><select id="study-ue" style="flex:1;min-width:150px"></select></div>
+      <div class="sbtn" style="margin-top:8px"><button class="btn sec" data-sm="15" type="button">+15 min</button><button class="btn sec" data-sm="30" type="button">+30 min</button><button class="btn teal" data-sm="60" type="button">+1 h</button><button class="btn sec" data-sm="-15" type="button">−15</button></div>
+      <p class="small muted" id="study-week" style="margin-top:8px"></p>
+    </div>
     <div class="card" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;margin-bottom:6px">
         <h3 style="margin:0">🎯 Contrôles continus P2</h3>
@@ -416,6 +444,7 @@ nav.bottom button{min-width:0}
 <section class="view" id="v-stats">
   <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:24px">📊 Mes stats</h2><div class="seg" id="stat-period"><button data-n="7" class="on">7 jours</button><button data-n="30">30 jours</button></div></div>
   <div class="card" id="stat-global"></div>
+  <div class="card sys mt" id="stat-sys"></div>
   <div class="grid g2 mt">
     <div class="card" id="stat-water"></div>
     <div class="card" id="stat-sleep"></div>
