@@ -834,18 +834,18 @@ async function sendChat(text) {
     w.innerHTML = esc(r.reply || "…").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
     const done = await runActions(r.actions);
     if (done.length) chatAdd("act", done.join("<br>"));
-    if (voiceOn()) speak(r.reply || "", () => { if (convo && $("ai-sheet").classList.contains("on")) listen(); });
+    if (voiceOn()) speak(r.reply || "", st => { if (convo && $("ai-sheet").classList.contains("on")) listen(st); else if (st) { try { st.getTracks().forEach(t => t.stop()); } catch (e) {} } });
   } catch (e) { w.innerHTML = aiErr(e); if (voiceOn()) speak(aiErr(e)); convo = false; setMic(""); }
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Assistant</h2><button class="btn sec" data-close>Fermer</button></div>
-    <div id="ai-log"><div class="msg bot">Salut Thyvan ! Pose-moi une question sur ton planning, tes évals, ou dis-moi ce que tu as mangé, bu, révisé… je le note pour toi.</div></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis</h2><button class="btn sec" data-close>Fermer</button></div>
+    <div id="ai-log"><div class="msg bot">Salut boss ! Touche le micro et parle-moi : planning, évals, révisions… ou dis-moi ce que tu as mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
-    <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
+    <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
     <form id="ai-form" class="row nowrap"><input id="ai-in" placeholder="Ou écris ta question…" autocomplete="off"><button class="btn teal">➤</button></form></div>`;
   document.body.appendChild(sh);
-  sh.onclick = e => { if (e.target === sh || e.target.closest("[data-close]")) { sh.classList.remove("on"); convo = false; stopListen(true); try { speechSynthesis.cancel(); } catch (er) {} } };
+  sh.onclick = e => { if (e.target === sh || e.target.closest("[data-close]")) { sh.classList.remove("on"); convo = false; stopListen(true); stopSpeaking(); setMic(""); } };
   $("ai-form").onsubmit = e => { e.preventDefault(); sendChat($("ai-in").value); };
   $("ai-chips").onclick = e => { const b = e.target.closest("button"); if (b) sendChat(b.textContent); };
   const btn = document.createElement("button"); btn.className = "iconbtn"; btn.id = "open-ai"; btn.setAttribute("aria-label", "Assistant IA"); btn.textContent = "🤖";
@@ -865,15 +865,74 @@ function pickVoice() {
   const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
   return v.find(x => /thomas|daniel|nicolas|henri|paul/i.test(x.name)) || v.find(x => /fr-FR/i.test(x.lang)) || v[0] || null;
 }
-function speak(text, after) {
+const VOICES = { oliver: ["8169ab87-bc99-4669-a5ec-6855860ace24", "Oliver · britannique, style Jarvis"], oliver2: ["e3596645-b1af-469e-b857-f18ddedc7652", "Oliver calme · britannique"], paul: ["98559b22-62b5-4a64-a7cd-fc78ca41faa8", "Paul · américain"], marie: ["5a271406-039d-46fe-835b-fbbb00eaf08d", "Marie · française"], device: ["", "Voix du téléphone (hors ligne)"] };
+function voiceKey() { try { const v = localStorage.getItem("thy-vsel"); return VOICES[v] ? v : "oliver"; } catch (e) { return "oliver"; } }
+function bargeOn() { try { return localStorage.getItem("thy-barge") !== "0"; } catch (e) { return true; } }
+var aiAudio = new Audio(), spkTok = 0, bargeStream = null, bargeTimer = null, bargeCtx = null;
+aiAudio.setAttribute("playsinline", "");
+const SILENT = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+function unlockAudio() { try { aiAudio.src = SILENT; aiAudio.play().catch(() => {}); } catch (e) {} try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }
+function cleanSpeech(t) { return String(t).replace(/\*\*/g, "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").trim(); }
+function stopSpeaking() { spkTok++; try { aiAudio.pause(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {} stopBarge(true); }
+function stopBarge(killStream) { clearInterval(bargeTimer); bargeTimer = null; try { bargeCtx && bargeCtx.close(); } catch (e) {} bargeCtx = null; if (killStream && bargeStream) { try { bargeStream.getTracks().forEach(t => t.stop()); } catch (e) {} bargeStream = null; } }
+async function startBarge(tok) {
+  if (!bargeOn() || !convo || !navigator.mediaDevices) return;
+  try { bargeStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch (e) { return; }
+  if (tok !== spkTok) { stopBarge(true); return; }
   try {
-    speechSynthesis.cancel();
-    const clean = String(text).replace(/\*\*/g, "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").trim();
-    if (!clean) { after && after(); return; }
-    const u = new SpeechSynthesisUtterance(clean); u.lang = "fr-FR"; u.rate = 1.05; const v = pickVoice(); if (v) u.voice = v;
-    u.onend = () => { setMic(""); after && after(); }; u.onerror = () => { setMic(""); };
-    setMic("talk"); speechSynthesis.speak(u);
-  } catch (e) { after && after(); }
+    bargeCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = bargeCtx.createAnalyser(); an.fftSize = 2048; bargeCtx.createMediaStreamSource(bargeStream).connect(an);
+    const buf = new Float32Array(an.fftSize); let floor = 0, n = 0, hot = 0; const t0 = Date.now();
+    bargeTimer = setInterval(() => {
+      an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; const rms = Math.sqrt(s / buf.length);
+      if (Date.now() - t0 < 600) { floor = Math.max(floor, rms); n++; return; }
+      if (rms > Math.max(0.03, floor * 2.2)) hot += 100; else hot = Math.max(0, hot - 50);
+      if (hot >= 350) { // tu parles par-dessus : il se tait et t'écoute
+        const st = bargeStream; bargeStream = null; spkTok++; try { aiAudio.pause(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {} stopBarge(false);
+        convo = true; listen(st);
+      }
+    }, 100);
+  } catch (e) {}
+}
+function speakDevice(text, tok) {
+  return new Promise(res => {
+    try {
+      const u = new SpeechSynthesisUtterance(text); u.lang = "fr-FR"; u.rate = 1.05; const v = pickVoice(); if (v) u.voice = v;
+      u.onend = () => res(); u.onerror = () => res();
+      if (tok !== spkTok) return res(); speechSynthesis.speak(u);
+    } catch (e) { res(); }
+  });
+}
+function playB64(b64, tok) {
+  return new Promise(res => {
+    if (tok !== spkTok) return res();
+    aiAudio.onended = () => res(); aiAudio.onerror = () => res(); aiAudio.onpause = () => { if (tok !== spkTok) res(); };
+    aiAudio.src = "data:audio/mpeg;base64," + b64; aiAudio.play().catch(() => res());
+  });
+}
+async function speak(text, after) {
+  stopSpeaking(); const tok = ++spkTok;
+  const clean = cleanSpeech(text); if (!clean) { after && after(); return; }
+  setMic("talk"); startBarge(tok);
+  const vk = voiceKey();
+  try {
+    if (vk === "device") await speakDevice(clean, tok);
+    else {
+      const parts = clean.match(/[^.!?…]+[.!?…]*\s*/g) || [clean];
+      const chunks = parts.length > 1 ? [parts[0], parts.slice(1).join("")] : [clean];
+      const reqs = chunks.map(c => callAI({ mode: "tts", text: c.trim(), voice: VOICES[vk][0] }).catch(() => null));
+      for (let k = 0; k < chunks.length; k++) {
+        if (tok !== spkTok) return;
+        const rr = await reqs[k];
+        if (tok !== spkTok) return;
+        if (rr && rr.audio) await playB64(rr.audio, tok); else await speakDevice(chunks[k], tok);
+      }
+    }
+  } catch (e) {}
+  if (tok !== spkTok) return; // coupé par l'utilisateur
+  const st = bargeStream; bargeStream = null; stopBarge(false);
+  setMic("");
+  if (after) after(st); else if (st) { try { st.getTracks().forEach(t => t.stop()); } catch (e) {} }
 }
 function blobToB64(b) { return new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.readAsDataURL(b); }); }
 function stopListen(cancel) {
@@ -882,10 +941,11 @@ function stopListen(cancel) {
   if (cancel) { try { recStream && recStream.getTracks().forEach(t => t.stop()); } catch (e) {} setMic(""); }
 }
 function manualMode() { try { return localStorage.getItem("thy-manual") === "1"; } catch (e) { return false; } }
-async function listen() {
+async function listen(existing) {
   if (rec && rec.state === "recording") return;
   if (!navigator.mediaDevices || !window.MediaRecorder) { setMic("", "Micro non disponible ici : utilise la dictée du clavier 🎤"); return; }
-  try { recStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  if (existing) recStream = existing;
+  else try { recStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
   catch (e) { setMic("", "Autorise le micro pour me parler (réglages du navigateur)."); convo = false; return; }
   const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"].find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
   rec = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined);
@@ -933,11 +993,14 @@ async function listen() {
 }
 (function () {
   const cb = $("ai-voice"); if (cb) { cb.checked = voiceOn(); cb.onchange = () => { try { localStorage.setItem("thy-voice", cb.checked ? "1" : "0"); } catch (e) {} if (!cb.checked) { convo = false; try { speechSynthesis.cancel(); } catch (e) {} } }; }
+  const bg = $("ai-barge"); if (bg) { bg.checked = bargeOn(); bg.onchange = () => { try { localStorage.setItem("thy-barge", bg.checked ? "1" : "0"); } catch (e) {} }; }
+  const vs = $("ai-vsel"); if (vs) { vs.innerHTML = Object.entries(VOICES).map(([k, v]) => `<option value="${k}">🎧 ${v[1]}</option>`).join(""); vs.value = voiceKey(); vs.onchange = () => { try { localStorage.setItem("thy-vsel", vs.value); } catch (e) {} }; }
+  const vt = $("ai-vtest"); if (vt) vt.onclick = () => { unlockAudio(); convo = false; speak("Bonjour boss. Je suis Jarvis, ton assistant. Tu as trois évals cette semaine, on s'organise ?"); };
   const mc = $("ai-manual"); if (mc) { mc.checked = manualMode(); mc.onchange = () => { try { localStorage.setItem("thy-manual", mc.checked ? "1" : "0"); } catch (e) {} }; }
   const b = $("ai-mic"); if (!b) return;
   b.onclick = () => {
-    try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {}
-    if (b.classList.contains("talk")) { try { speechSynthesis.cancel(); } catch (e) {} convo = voiceOn(); listen(); return; }
+    unlockAudio();
+    if (b.classList.contains("talk")) { stopSpeaking(); convo = voiceOn(); listen(); return; }
     if (rec && rec.state === "recording") { stopListen(false); return; }
     if (b.classList.contains("busy")) return;
     convo = voiceOn(); listen();
