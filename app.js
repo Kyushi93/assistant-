@@ -671,7 +671,7 @@ $("stat-goals").addEventListener("change", e => { const i = e.target.closest("[d
 $("stat-period").onclick = e => { const b = e.target.closest("[data-n]"); if (!b) return; statN = +b.dataset.n; renderStats(); };
 window.__v9 = true; syncGoal(); renderAll();
 
-/* ===== v10 : révisions, fenêtre de statut ===== */
+/* ===== v10 : révisions, diagramme d'équilibre ===== */
 function fmtMin(m) { m = Math.round(m); return m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? String(m % 60).padStart(2, "0") : "") : m + " min"; }
 function renderStudy() {
   if (!$("study-card")) return;
@@ -693,56 +693,37 @@ $("study-card") && $("study-card").addEventListener("click", e => {
   save(); renderAll(); toast(v > 0 ? `+${v} min de révision 📚` : "Retiré");
 });
 
-/* Fenêtre de statut : niveau, rang, stats */
-function dayXP(s) {
-  const d = S.days[s]; const G = goals(); let xp = 0;
-  if (d) {
-    xp += Math.min(20, (d.water || 0) / 1000 / G.water * 20);
-    if (+d.sleep) xp += Math.min(20, d.sleep / G.sleep * 20);
-    if (d.gym && d.gym !== "repos") xp += 30;
-    xp += Math.min(90, +d.study || 0);
-    if (dayMacros(d).n >= 2) xp += 10;
-  }
-  xp += Math.min(45, S.tasks.filter(t => t.done && t.d === s).length * 15);
-  return xp;
-}
-function levelInfo() {
-  let xp = 0; const keys = new Set(Object.keys(S.days)); S.tasks.forEach(t => t.done && t.d && keys.add(t.d));
-  keys.forEach(s => { if (s <= TODAY()) xp += dayXP(s); });
-  let lvl = 1, need = 100, rest = xp;
-  while (rest >= need) { rest -= need; lvl++; need = Math.round(need * 1.12); }
-  const rank = lvl >= 50 ? "S" : lvl >= 35 ? "A" : lvl >= 22 ? "B" : lvl >= 12 ? "C" : lvl >= 5 ? "D" : "E";
-  return { xp: Math.round(xp), lvl, rest: Math.round(rest), need, rank };
-}
+/* Diagramme d'équilibre (radar) */
 function radarSvg(vals) {
-  const N = vals.length, cx = 150, cy = 150, R = 100, pt = (i, f) => { const a = -Math.PI / 2 + i * 2 * Math.PI / N; return [cx + Math.cos(a) * R * f, cy + Math.sin(a) * R * f]; };
-  let s = `<svg viewBox="0 0 300 300"><defs><filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
-  [.25, .5, .75, 1].forEach(f => s += `<polygon points="${vals.map((_, i) => pt(i, f).join(",")).join(" ")}" fill="none" stroke="rgba(92,200,255,${f === 1 ? .6 : .2})" stroke-width="1"/>`);
-  vals.forEach((_, i) => { const [x, y] = pt(i, 1); s += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(92,200,255,.2)"/>`; });
-  const poly = vals.map((v, i) => pt(i, Math.max(.04, (v.v || 0) / 100)).join(",")).join(" ");
-  s += `<polygon points="${poly}" fill="rgba(63,169,255,.35)" stroke="#7FDBFF" stroke-width="2" filter="url(#glow)"/>`;
-  vals.forEach((v, i) => { const [x, y] = pt(i, Math.max(.04, (v.v || 0) / 100)); s += `<circle cx="${x}" cy="${y}" r="3.5" fill="#fff" filter="url(#glow)"/>`; const [lx, ly] = pt(i, 1.2); s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#9DD8FF" font-size="13" font-weight="800" letter-spacing="1.5">${v.k}</text>`; });
+  const N = vals.length, cx = 160, cy = 150, R = 100, pt = (i, f) => { const a = -Math.PI / 2 + i * 2 * Math.PI / N; return [cx + Math.cos(a) * R * f, cy + Math.sin(a) * R * f]; };
+  let s = `<svg viewBox="0 0 320 300" class="radar">`;
+  [.25, .5, .75, 1].forEach(f => s += `<polygon points="${vals.map((_, i) => pt(i, f).join(",")).join(" ")}" class="rgrid"/>`);
+  vals.forEach((_, i) => { const [x, y] = pt(i, 1); s += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="rgrid"/>`; });
+  s += `<polygon points="${vals.map((v, i) => pt(i, Math.max(.03, (v.v || 0) / 100)).join(",")).join(" ")}" fill="var(--teal)" fill-opacity=".28" stroke="var(--teal)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  vals.forEach((v, i) => {
+    const [x, y] = pt(i, Math.max(.03, (v.v || 0) / 100)); s += `<circle cx="${x}" cy="${y}" r="4.5" fill="${v.c}"/>`;
+    const [lx, ly] = pt(i, 1.24); s += `<text x="${lx}" y="${ly - 7}" text-anchor="middle" class="rl">${v.k}</text><text x="${lx}" y="${ly + 10}" text-anchor="middle" class="rv" fill="${v.c}">${v.v == null ? "—" : Math.round(v.v) + "%"}</text>`;
+  });
   return s + `</svg>`;
 }
-function renderSys() {
+function renderRadar() {
   if (!$("stat-sys")) return;
-  const st = computeStats(statN), L = levelInfo();
-  const ds = lastDays(statN); const reg = ds.filter(s => { const d = S.days[s] || {}; return [d.water > 0, +d.sleep > 0, !!d.gym, +d.study > 0, (d.meals || []).length > 0].filter(Boolean).length >= 2; }).length / statN * 100;
-  const v = [
-    { k: "FOR", n: "Force · sport", v: st.pSp },
-    { k: "AGI", n: "Agilité · régularité", v: reg },
-    { k: "END", n: "Endurance · hydratation", v: st.pW },
-    { k: "VIT", n: "Vitalité · sommeil", v: st.pS },
-    { k: "INT", n: "Intelligence · études", v: st.pE },
-    { k: "SEN", n: "Sens · nutrition", v: st.pN }
-  ];
-  const title = L.lvl >= 35 ? "Maître du corps humain" : L.lvl >= 22 ? "Ostéo d'élite" : L.lvl >= 12 ? "Praticien en devenir" : L.lvl >= 5 ? "Apprenti ostéo" : "Éveillé";
-  $("stat-sys").innerHTML = `<div class="sh"><span>◆ Fenêtre de statut</span><span>${statN} j</span></div>
-    <div class="lvl"><div><div class="kv">Niveau</div><b>${L.lvl}</b></div><div><div class="kv">Rang</div><span class="rank">${L.rank}</span></div><div style="flex:1;min-width:150px"><div class="kv">Nom</div><div style="font-weight:800;font-size:16px;color:#fff">Thyvan Chu</div><div class="kv" style="margin-top:4px">Titre</div><div style="font-weight:700;color:#BFE6FF">${title}</div></div></div>
-    <div class="xp"><i style="width:${L.rest / L.need * 100}%"></i></div><div class="kv" style="display:flex;justify-content:space-between"><span>XP ${L.rest} / ${L.need}</span><span>Total ${L.xp} XP</span></div>
-    <div class="sbody" style="margin-top:12px">${radarSvg(v)}<div class="stl">${v.map(x => `<div><span>${x.k}<small>${x.n}</small></span><b>${x.v == null ? "—" : Math.round(x.v)}</b></div>`).join("")}</div></div>
-    <p class="small muted" style="margin-top:10px">Chaque jour tu gagnes de l'XP : eau (20), sommeil (20), séance de sport (30), 1 XP par minute de révision (max 90), repas notés (10), tâches faites (15 chacune). Rang E → D (niv. 5) → C (12) → B (22) → A (35) → S (50).</p>`;
+  const st = computeStats(statN);
+  $("stat-sys").innerHTML = `<h3>🕸️ Mon équilibre <small class="muted" style="font-weight:600">${statN} derniers jours</small></h3>` + radarSvg([
+    { k: "💧 Eau", v: st.pW, c: "#2563EB" }, { k: "😴 Sommeil", v: st.pS, c: "#7C3AED" }, { k: "🏋️ Sport", v: st.pSp, c: "#E4572E" },
+    { k: "🍽️ Nutrition", v: st.pN, c: "#0F766E" }, { k: "📚 Études", v: st.pE, c: "#C98B12" }]) +
+    `<p class="small muted" style="text-align:center">Plus la forme est grande et régulière, plus tu es équilibré. Chaque pointe = % de ton objectif atteint.</p>`;
 }
-{ const _ra = renderAll; renderAll = function () { _ra(); renderStudy(); renderSys(); }; }
-renderStudy(); renderSys();
-$("stat-period") && $("stat-period").addEventListener("click", () => setTimeout(renderSys));
+
+/* Couleurs du calendrier adaptées au mode sombre (mêmes teintes, plus lumineuses) */
+const KLIGHT = Object.assign({}, KCOL);
+const KDARK = { pao: "#F472D0", cm: "#6366F1", td: "#38BDF8", clin: "#14B8A6", eval: "#F04444", perso: "#A78BFA", sante: "#2DB3A3", autre: "#8A948F", cours: "#38BDF8", off: "#9CA3AF" };
+function themeColors() {
+  Object.assign(KCOL, document.documentElement.dataset.theme === "dark" ? KDARK : KLIGHT);
+  document.querySelectorAll(".legend [data-k]").forEach(s => s.style.setProperty("--c", KCOL[s.dataset.k]));
+}
+new MutationObserver(() => { themeColors(); renderAll(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+themeColors();
+{ const _ra = renderAll; renderAll = function () { _ra(); renderStudy(); renderRadar(); }; }
+$("stat-period") && $("stat-period").addEventListener("click", () => setTimeout(renderRadar));
+renderAll();
