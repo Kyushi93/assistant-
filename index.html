@@ -263,6 +263,25 @@ nav.bottom button{min-width:0}
 [data-theme=dark] .sheet{background:rgba(0,0,0,.6)}
 [data-theme=dark] .toast{background:#E7EEEA;color:#0E1413}
 [data-theme=dark] .wday .wh{color:var(--ink)}[data-theme=dark] .wday.today .wh{color:var(--teal)}
+/* IA */
+.aibox{border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:10px;background:var(--card)}
+.aing{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.aing small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.aing input{width:64px;padding:6px 8px;text-align:right}
+.aing em{font-style:normal;font-weight:700;font-size:13px;min-width:62px;text-align:right}
+.atot{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;text-align:center}
+.atot div{background:var(--bg);border-radius:12px;padding:8px 2px}.atot b{display:block;font-size:17px}.atot span{font-size:11px;color:var(--muted);font-weight:700}
+.aiin{display:flex;flex-direction:column;height:86vh}
+#ai-log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:6px 2px 10px}
+.msg{max-width:86%;padding:10px 13px;border-radius:18px;font-size:15px;line-height:1.4}
+.msg.bot{background:var(--card);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:6px}
+.msg.me{background:var(--teal);color:#fff;align-self:flex-end;border-bottom-right-radius:6px}
+.msg.act{align-self:center;background:transparent;border:1px dashed var(--teal);font-size:13px;color:var(--muted)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}
+.chips button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;color:var(--ink)}
+.dots i{display:inline-block;width:7px;height:7px;margin:0 2px;border-radius:50%;background:var(--muted);animation:bl 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,100%{opacity:.25}50%{opacity:1}}
 /* Barre du bas flottante (mobile) */
 @media(max-width:899px){
   nav.bottom{position:fixed!important;left:12px;right:12px;bottom:calc(max(var(--sb) - 18px, 8px));order:0;padding:6px;border:1px solid var(--line);border-radius:26px;box-shadow:0 10px 30px rgba(22,33,31,.18),0 2px 8px rgba(22,33,31,.08);background:rgba(255,255,255,.88)}
@@ -418,10 +437,10 @@ nav.bottom button{min-width:0}
       <div id="meals"></div>
       <form id="meal-form" class="grid" style="gap:8px;margin-top:12px">
         <div class="row nowrap"><select id="meal-k" style="width:120px"><option>Petit-déj</option><option>Déjeuner</option><option>Collation</option><option>Dîner</option></select><input id="meal-g" type="number" inputmode="numeric" min="1" value="150" style="width:90px" aria-label="Quantité en grammes"><span class="small muted">grammes</span></div>
-        <div class="row nowrap"><input id="meal-d" placeholder="Ex. riz, poulet grillé, 200g pâtes…" required autocomplete="off"><button class="btn teal" aria-label="Chercher">🔎</button></div>
+        <div class="row nowrap"><input id="meal-d" placeholder="Ex. tacos 3 viandes, pâtes bolo, bowl poulet…" required autocomplete="off"><button class="btn teal" aria-label="Analyser avec l'IA">✨</button><button class="btn sec" id="meal-search" type="button" aria-label="Chercher un aliment">🔎</button></div>
       </form>
       <div id="food-res"></div>
-      <p class="small muted" style="margin-top:8px">Valeurs nutritionnelles : table Ciqual (ANSES) et Open Food Facts.</p>
+      <p class="small muted" style="margin-top:8px">✨ = l'IA décortique ton plat entier · 🔎 = un aliment précis (avec les grammes). Valeurs : table Ciqual (ANSES), Open Food Facts.</p>
     </div>
     <div class="card">
       <h3>📈 7 derniers jours</h3>
