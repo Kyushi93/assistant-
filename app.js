@@ -401,6 +401,8 @@ function renderSante() {
   const gd = $("gym-dur"), gn = $("gym-note"), sl = $("sleep");
   gd.value = d.dur || ""; gn.value = d.gnote || ""; sl.value = d.sleep || "";
   gd.onchange = () => { d.dur = gd.value; save(); }; gn.onchange = () => { d.gnote = gn.value; save(); }; sl.onchange = () => { d.sleep = sl.value; save(); renderWeek(); };
+  const wt = $("weight"); if (wt) { wt.value = d.weight || ""; wt.onchange = () => { const v = parseFloat(String(wt.value).replace(",", ".")); if (v > 30 && v < 250) d.weight = v; else delete d.weight; save(); renderSante(); }; }
+  if ($("bulk-card")) $("bulk-card").innerHTML = bulkPanel();
   $("energy").innerHTML = [1, 2, 3, 4, 5].map(i => `<button data-en="${i}" class="${d.energy >= i ? "on" : ""}">★</button>`).join("");
   $("energy").onclick = e => { const b = e.target.closest("button"); if (!b) return; d.energy = +b.dataset.en; save(); renderSante(); };
   $("mood").innerHTML = MOODS.map(m => `<button data-m="${m}" class="${d.mood === m ? "on" : ""}" style="font-size:18px;padding:4px 8px">${m}</button>`).join("");
@@ -539,7 +541,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 
 /* ---------- v9 : objectifs, statistiques, macros, thème ---------- */
 var DEF_GOALS = { water: 2.5, sleep: 8, sport: 4, kcal: 2600, prot: 110 };
-function goals() { return Object.assign({ water: 2.5, sleep: 8, sport: 4, kcal: 2600, prot: 110, study: 60 }, S.goals || {}); }
+function goals() { return Object.assign({ water: 2.5, sleep: 8, sport: 4, kcal: 2950, prot: 140, carb: 440, fat: 70, wrate: 0.25, study: 60 }, S.goals || {}); }
 function syncGoal() { GOAL = Math.round(goals().water * 1000); const w = document.querySelector(".ring .v .small"); if (w) w.textContent = "/ " + fmtL(GOAL); const hw = $("h-goal"); if (hw) hw.textContent = fmtL(GOAL); }
 
 /* Thème clair / sombre */
@@ -614,10 +616,7 @@ function dayMacros(d) { const t = { kcal: 0, p: 0, c: 0, f: 0, n: 0 }; (d.meals 
 function renderMeals() {
   const d = day(hDate()); const t = dayMacros(d); const G = goals();
   $("meals").innerHTML = d.meals.length ? d.meals.map((m, i) => `<div class="meal"><span class="k">${esc(m.k)}</span><span style="flex:1">${esc(m.d)}${m.kcal != null ? `<br><small class="muted">${m.g} g · ${m.kcal} kcal · P ${m.p} · G ${m.c} · L ${m.f}</small>` : ""}</span><button class="x" data-delmeal="${i}">×</button></div>`).join("") : `<div class="empty">Aucun repas noté pour ce jour.</div>`;
-  const bar = (v, goal, col) => `<div class="bar"><i style="width:${Math.min(100, v / goal * 100)}%;background:${col}"></i></div>`;
-  $("macro-tot").innerHTML = `<div class="mrow"><span>🔥 Calories</span><b>${Math.round(t.kcal)} / ${G.kcal} kcal</b></div>${bar(t.kcal, G.kcal, "#E4572E")}
-    <div class="mrow"><span>🥩 Protéines</span><b>${Math.round(t.p)} / ${G.prot} g</b></div>${bar(t.p, G.prot, "#0F766E")}
-    <div class="mrow3"><span>🍚 Glucides <b>${Math.round(t.c)} g</b></span><span>🧈 Lipides <b>${Math.round(t.f)} g</b></span></div>`;
+  $("macro-tot").innerHTML = macroPanel(t, G, hDate() === TODAY());
 }
 
 /* Statistiques */
@@ -683,8 +682,8 @@ function renderStats() {
     ${st.up.length ? st.up.map(c => `<div class="srow"><span><b>${c.ue}</b> ${esc(c.name)} <small class="muted">${jx(diffDays(c.date))}</small></span><div class="bar"><i style="width:${S.rev[c.id] || 0}%;background:${diffDays(c.date) <= 7 ? "#DC2626" : "var(--teal)"}"></i></div><b>${S.rev[c.id] || 0}%</b></div>`).join("") : ""}`;
   const gi = (k, label, unit, step) => `<label class="goal"><span>${label}</span><input type="number" inputmode="decimal" step="${step}" min="0" data-goal="${k}" value="${G[k]}"><em>${unit}</em></label>`;
   $("stat-goals").innerHTML = `<h3>🎯 Mes objectifs</h3><p class="small muted" style="margin-bottom:8px">Ce sont les cibles qui servent à calculer tes pourcentages. Modifie-les quand tu veux.</p>
-    ${gi("study", "📚 Révision par jour", "min", "15")}${gi("water", "💧 Eau par jour", "L", "0.1")}${gi("sleep", "😴 Sommeil par nuit", "h", "0.5")}${gi("sport", "🏋️ Séances de sport", "/ semaine", "1")}${gi("kcal", "🔥 Calories par jour", "kcal", "50")}${gi("prot", "🥩 Protéines par jour", "g", "5")}
-    <p class="small muted" style="margin-top:8px">Repères : ~1 h de révision perso/jour en moyenne (le week-end compte aussi), ~35 ml d'eau/kg, 7–9 h de sommeil, 1,6 g de protéines/kg si tu fais de la muscu. Les calories dépendent de ton activité : ajuste selon ta forme.</p>`;
+    ${gi("study", "📚 Révision par jour", "min", "15")}${gi("water", "💧 Eau par jour", "L", "0.1")}${gi("sleep", "😴 Sommeil par nuit", "h", "0.5")}${gi("sport", "🏋️ Séances de sport", "/ semaine", "1")}${gi("kcal", "🔥 Calories par jour", "kcal", "50")}${gi("prot", "🥩 Protéines par jour", "g", "5")}${gi("carb", "🍚 Glucides par jour", "g", "10")}${gi("fat", "🧈 Lipides par jour", "g", "5")}${gi("wrate", "⚖️ Prise de poids visée", "kg / sem.", "0.05")}
+    <p class="small muted" style="margin-top:8px">Prise de masse propre (≈70 kg) : protéines ~2 g/kg, lipides ~1 g/kg, glucides = le reste, léger surplus de calories pour prendre ~0,25 kg par semaine. Si ton poids ne bouge pas en 2 semaines : +150 kcal ; s'il monte plus vite que 0,4 kg/sem : −150 kcal. Révision ~1 h/jour, eau ~35 ml/kg, sommeil 7–9 h.</p>`;
 }
 $("stat-goals").addEventListener("change", e => { const i = e.target.closest("[data-goal]"); if (!i) return; const v = parseFloat(String(i.value).replace(",", ".")); if (!(v > 0)) return; S.goals = Object.assign({}, S.goals || {}, { [i.dataset.goal]: v }); save(); syncGoal(); renderAll(); toast("Objectif mis à jour 🎯"); });
 $("stat-period").onclick = e => { const b = e.target.closest("[data-n]"); if (!b) return; statN = +b.dataset.n; renderStats(); };
@@ -827,7 +826,7 @@ function aiCtx() {
     evals_a_venir: upcomingCC().slice(0, 10).map(c => ({ date: c.date, dans_jours: diffDays(c.date), ue: c.ue, intitule: c.name, cc: c.cc, modalite: c.mod, note: c.note, revise_pct: S.rev[c.id] || 0 })),
     taches_a_faire: S.tasks.filter(x => !x.done).slice(0, 25).map(x => ({ t: x.t, d: x.d, c: x.c })),
     aujourdhui: { eau_ml: d.water || 0, sommeil_h: d.sleep || null, sport: d.gym || null, revision_min: d.study || 0, repas: (d.meals || []).map(m => m.d + (m.kcal != null ? " (" + m.kcal + " kcal, " + m.p + " g prot)" : "")) },
-    objectifs: goals(),
+    objectifs: Object.assign({ programme: "prise de masse propre (muscle sans trop de gras) pour un shooting photo en Chine en août 2027 ; sèche légère à partir du 7 juin 2027", poids_moyen_7j: weightAvg(addD(TODAY(), -6), TODAY()) }, goals()),
     stats_7_jours_pct: { eau: Math.round(st.pW), sommeil: st.pS == null ? null : Math.round(st.pS), sport: Math.round(st.pSp), nutrition: st.pN == null ? null : Math.round(st.pN), etudes: Math.round(st.pE), revision_totale_min: st.studyTot },
     infos_ecole: (NEWS || []).slice(0, 6).map(n => n.date + " " + n.title + " : " + (n.body || "").slice(0, 160))
   };
@@ -866,7 +865,7 @@ async function sendChat(text) {
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v20</small></h2><button class="btn sec" data-close>Fermer</button></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v21</small></h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Bonjour boss. Touchez le micro et parlez-moi : planning, évals, révisions… ou dites-moi ce que vous avez mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
     <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
@@ -1042,3 +1041,38 @@ async function listen(existing) {
   };
   try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices(); } catch (e) {}
 })();
+
+/* ===== v21 : prise de masse propre ===== */
+function macroPanel(t, G, isToday) {
+  const rows = [["🔥", "Calories", t.kcal, G.kcal, "kcal", "#E4572E", 0.93, 1.08], ["🥩", "Protéines", t.p, G.prot, "g", "#0F766E", 0.9, 1.35], ["🍚", "Glucides", t.c, G.carb, "g", "#C98B12", 0.85, 1.2], ["🧈", "Lipides", t.f, G.fat, "g", "#7C3AED", 0.75, 1.3]];
+  const st = (v, g, lo, hi) => v < g * lo ? ["lo", "en dessous"] : v > g * hi ? ["hi", "au-dessus"] : ["ok", "objectif ✓"];
+  let html = rows.map(([ic, nm, v, g, u, col, lo, hi]) => { const [c, l] = st(v, g, lo, hi); const mx = Math.max(g * 1.35, v);
+    return `<div class="mstat"><span>${ic} ${nm}</span><span><b>${Math.round(v)}</b> / ${g} ${u} ${t.n ? `<em class="${c}">${l}</em>` : ""}</span></div><div class="mbar"><i style="width:${Math.min(100, v / mx * 100)}%;background:${col}"></i><s style="left:${g / mx * 100}%"></s></div>`; }).join("");
+  if (!t.n) return html + `<div class="mtips">Ajoute tes repas avec ✨ pour voir si tu atteins tes objectifs de prise de masse.</div>`;
+  const tips = [], dk = G.kcal - t.kcal, dp = G.prot - t.p, dc = G.carb - t.c, df = G.fat - t.f;
+  if (dp > 15) tips.push(`🥩 Il te manque <b>${Math.round(dp)} g de protéines</b> : par ex. ${dp > 45 ? "200 g de poulet ou de bœuf" : dp > 25 ? "un skyr + 2 œufs, ou 120 g de poulet" : "un skyr ou un verre de lait"}.`);
+  else if (t.p >= G.prot * 0.9) tips.push(`🥩 Protéines OK, c'est le plus important pour le muscle.`);
+  if (dc > 60) tips.push(`🍚 Encore <b>${Math.round(dc)} g de glucides</b> : riz, pâtes, pain, flocons d'avoine, banane… c'est ton carburant pour la salle.`);
+  if (t.f > G.fat * 1.3) tips.push(`🧈 Beaucoup de lipides (${Math.round(t.f)} g) : souvent les sauces, la friture et les viennoiseries. C'est ce qui fait prendre du gras.`);
+  else if (df > 25 && dk > 300) tips.push(`🧈 Il reste de la place pour ${Math.round(df)} g de bons lipides : huile d'olive, avocat, noix, œufs.`);
+  if (t.kcal > G.kcal * 1.12) tips.push(`🔥 <b>${Math.round(-dk)} kcal au-dessus</b> de l'objectif : un excès ponctuel n'est pas grave, mais si ça se répète, tu prendras surtout du gras.`);
+  else if (dk > 250) tips.push(isToday ? `🔥 Il te reste <b>~${Math.round(dk)} kcal</b> à manger aujourd'hui.` : `🔥 Ce jour-là, il manquait ~${Math.round(dk)} kcal : en prise de masse, manger trop peu = pas de muscle en plus.`);
+  else tips.push(`🔥 Calories dans la cible, parfait pour une prise de masse propre.`);
+  return html + `<div class="mtips">${tips.map(x => `<div>${x}</div>`).join("")}</div>`;
+}
+function weightAvg(from, to) { let s = 0, n = 0; for (let x = from; x <= to; x = addD(x, 1)) { const w = S.days[x] && +S.days[x].weight; if (w) { s += w; n++; } } return n ? s / n : null; }
+function bulkPanel() {
+  const G = goals(), t = TODAY(), shoot = "2027-08-01", cutStart = "2027-06-07";
+  const a1 = weightAvg(addD(t, -6), t), a0 = weightAvg(addD(t, -13), addD(t, -7));
+  const rate = a1 != null && a0 != null ? a1 - a0 : null;
+  const phase = t < cutStart ? "bulk" : t < shoot ? "cut" : "done";
+  let adv = "Pèse-toi le matin à jeun (3 à 7 fois par semaine) : je compare la moyenne de chaque semaine pour ajuster tes calories.";
+  if (rate != null) {
+    if (phase === "bulk") adv = rate < 0.1 ? `Ton poids stagne (${rate >= 0 ? "+" : ""}${rate.toFixed(2).replace(".", ",")} kg/sem) : ajoute <b>~150 kcal par jour</b> (un bol de riz ou une banane + des flocons d'avoine).` : rate > 0.45 ? `Tu prends vite (+${rate.toFixed(2).replace(".", ",")} kg/sem) : retire <b>~150 kcal par jour</b> pour limiter le gras.` : `+${rate.toFixed(2).replace(".", ",")} kg/sem : rythme parfait pour une prise de masse propre 👌`;
+    else adv = `${rate.toFixed(2).replace(".", ",")} kg/sem : en sèche, vise environ −0,4 à −0,6 kg par semaine.`;
+  }
+  const weeks = Math.max(0, Math.round((parse(shoot) - parse(t)) / 864e5 / 7));
+  return `<div class="bulk"><h4>📸 Objectif shooting en Chine (août 2027) · ${weeks} semaines</h4>
+    <div class="bphase"><div class="${phase === "bulk" ? "on" : ""}"><b>1. Prise de masse</b>jusqu'au 6 juin · +${String(G.wrate).replace(".", ",")} kg/sem</div><div class="${phase === "cut" ? "on" : ""}"><b>2. Sèche légère</b>7 juin → fin juillet, pour être sec</div></div>
+    <div class="small">${a1 != null ? `Poids moyen cette semaine : <b>${a1.toFixed(1).replace(".", ",")} kg</b>. ` : ""}${adv}</div></div>`;
+}
