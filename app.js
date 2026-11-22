@@ -410,14 +410,28 @@ function renderSante() {
 }
 $("meal-form").onsubmit = e => { e.preventDefault(); const i = $("meal-d"); day(hDate()).meals.push({ k: $("meal-k").value, d: i.value.trim() }); i.value = ""; save(); renderSante(); };
 function renderWeek() {
-  let h = "", tot = 0, ok = 0, sl = 0, sn = 0;
+  const G = goals(), GW = G.water * 1000; let wT = 0, wOk = 0, sl = 0, sn = 0, slOk = 0, gym = 0, kc = 0, kn = 0, pr = 0, st = 0, rows = "";
   for (let i = 6; i >= 0; i--) {
-    const x = new Date(); x.setDate(x.getDate() - i); const g = S.days[iso(x)] || {}; const w = g.water || 0;
-    tot += w; if (w >= GOAL) ok++; if (+g.sleep) { sl += +g.sleep; sn++; }
-    h += `<div class="c"><em>${w ? (w / 1000).toFixed(1) : ""}</em><i class="${w >= GOAL ? "goal" : ""}" style="height:${Math.min(100, w / 3500 * 100)}%"></i><small>${JOURS[x.getDay()].slice(0, 2)}</small></div>`;
+    const x = new Date(); x.setDate(x.getDate() - i); const s = iso(x), g = S.days[s] || {};
+    const w = g.water || 0, slp = +g.sleep || 0, gy = g.gym && g.gym !== "repos" ? g.gym : (g.gym === "repos" ? "repos" : ""), mm = dayMacros(g), stu = +g.study || 0;
+    wT += w; if (w >= GW) wOk++; if (slp) { sl += slp; sn++; if (slp >= G.sleep) slOk++; } if (gy && gy !== "repos") gym++; if (mm.n) { kc += mm.kcal; pr += mm.p; kn++; } st += stu;
+    const cell = (ok, txt, empty) => `<td class="${txt === "" ? "na" : ok ? "ok" : "ko"}">${txt === "" ? (empty || "·") : txt}</td>`;
+    rows += `<tr class="${i === 0 ? "today" : ""}"><th>${JOURS[x.getDay()].slice(0, 3)}<small>${x.getDate()}</small></th>
+      <td class="wbar ${w >= GW ? "ok" : w ? "ko" : "na"}"><i style="width:${Math.min(100, w / GW * 100)}%"></i><span>${w ? (w / 1000).toFixed(1).replace(".", ",") : "·"}</span></td>
+      ${cell(slp >= G.sleep, slp ? String(slp).replace(".", ",") + " h" : "")}
+      ${gy === "repos" ? `<td class="na">😌 repos</td>` : cell(!!gy, gy ? "💪 " + gy : "")}
+      ${cell(mm.n && mm.p >= G.prot * 0.8, mm.n ? Math.round(mm.kcal) : "")}
+      ${cell(stu >= G.study, stu ? fmtMin(stu) : "")}</tr>`;
   }
-  $("w-chart").innerHTML = h; renderGymWeek("gymweek");
-  $("week-kpi").innerHTML = `<div><span class="lbl">Moy. eau</span><b>${fmtL(tot / 7)}</b></div><div><span class="lbl">Objectif</span><b>${ok}/7</b></div><div><span class="lbl">Séances</span><b>${countGymWeek()}</b></div><div><span class="lbl">Sommeil</span><b>${sn ? (sl / sn).toFixed(1) + " h" : "—"}</b></div>`;
+  $("wk-table").innerHTML = `<table class="wkt"><thead><tr><th></th><th>💧 Eau (L)</th><th>😴</th><th>🏋️</th><th>🍽️ kcal</th><th>📚</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="small muted" style="margin-top:6px">Vert = objectif atteint · rouge = en dessous · gris = rien noté.</p>`;
+  const card = (ic, title, big, sub, pct, col) => `<div class="wsum"><div class="ws-h"><span>${ic} ${title}</span><b>${big}</b></div><div class="bar"><i style="width:${Math.min(100, pct)}%;background:${col}"></i></div><small>${sub}</small></div>`;
+  $("wk-sum").innerHTML =
+    card("💧", "Eau", fmtL(wT / 7) + "/j", `objectif ${fmtL(GW)} · atteint ${wOk} jour${wOk > 1 ? "s" : ""} sur 7`, wT / 7 / GW * 100, "#2563EB") +
+    card("😴", "Sommeil", sn ? (sl / sn).toFixed(1).replace(".", ",") + " h/nuit" : "—", sn ? `objectif ${G.sleep} h · ${slOk} nuit${slOk > 1 ? "s" : ""} OK sur ${sn} notées` : "note ton sommeil chaque matin", sn ? sl / sn / G.sleep * 100 : 0, "#7C3AED") +
+    card("🏋️", "Sport", gym + " séance" + (gym > 1 ? "s" : ""), `objectif ${G.sport} par semaine`, gym / G.sport * 100, "#E4572E") +
+    card("🍽️", "Nutrition", kn ? Math.round(kc / kn) + " kcal/j" : "—", kn ? `${Math.round(pr / kn)} g de protéines/j · objectif ${G.kcal} kcal, ${G.prot} g` : "ajoute tes repas avec ✨", kn ? kc / kn / G.kcal * 100 : 0, "#0F766E") +
+    card("📚", "Révisions", fmtMin(st), `objectif ${fmtMin(G.study * 7)} sur la semaine`, st / (G.study * 7) * 100, "#C98B12");
 }
 
 /* ---------- NOTIFICATIONS ---------- */
@@ -834,17 +848,19 @@ async function sendChat(text) {
   chatAdd("me", esc(text)); $("ai-in").value = "";
   const w = chatAdd("bot", `<span class="dots"><i></i><i></i><i></i></span>`);
   try {
-    const r = await callAI({ mode: "chat", text, today: TODAY() + " (" + JOURS[new Date().getDay()] + ") " + new Date().toTimeString().slice(0, 5), ctx: aiCtx(), history: aiHist });
+    const vo = voiceOn() && voiceKey() !== "device";
+    const r = await callAI({ mode: "chat", text, today: TODAY() + " (" + JOURS[new Date().getDay()] + ") " + new Date().toTimeString().slice(0, 5), ctx: aiCtx(), history: aiHist, tts: vo ? VOICES[voiceKey()][0] : undefined });
     aiHist.push({ role: "user", content: text }, { role: "assistant", content: r.reply || "" }); aiHist = aiHist.slice(-12);
-    w.innerHTML = esc(r.reply || "…").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+    const show = () => { w.innerHTML = esc(r.reply || "…").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>"); $("ai-log").scrollTop = 1e9; };
+    if (!voiceOn()) show();
     const done = await runActions(r.actions);
     if (done.length) chatAdd("act", done.join("<br>"));
-    if (voiceOn()) speak(r.reply || "", st => { if (convo && $("ai-sheet").classList.contains("on")) listen(st); else if (st) { try { st.getTracks().forEach(t => t.stop()); } catch (e) {} } });
+    if (voiceOn()) speak(r.reply || "", st => { if (convo && $("ai-sheet").classList.contains("on")) listen(st); else if (st) { try { st.getTracks().forEach(t => t.stop()); } catch (e) {} } }, { audio0: r.audio0, rest: r.rest, onStart: show });
   } catch (e) { w.innerHTML = aiErr(e); if (voiceOn()) speak(aiErr(e)); convo = false; setMic(""); }
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v17</small></h2><button class="btn sec" data-close>Fermer</button></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v18</small></h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Bonjour boss. Touchez le micro et parlez-moi : planning, évals, révisions… ou dites-moi ce que vous avez mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
     <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
@@ -870,8 +886,8 @@ function pickVoice() {
   const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
   return v.find(x => /thomas|daniel|nicolas|henri|paul/i.test(x.name)) || v.find(x => /fr-FR/i.test(x.lang)) || v[0] || null;
 }
-const VOICES = { pierre: ["ref:pierre", "Pierre · français, posé (majordome)"], tom: ["ref:tom", "Tom · français, plus jeune"], marie: ["5a271406-039d-46fe-835b-fbbb00eaf08d", "Marie · française"], device: ["", "Voix du téléphone (hors ligne)"] };
-function voiceKey() { try { const v = localStorage.getItem("thy-vsel"); return VOICES[v] ? v : "pierre"; } catch (e) { return "pierre"; } }
+const VOICES = { auto: ["auto", "Jarvis HD (meilleure voix dispo)"], pierre: ["ref:pierre", "Pierre · français, posé"], tom: ["ref:tom", "Tom · français, plus jeune"], device: ["", "Voix du téléphone (hors ligne)"] };
+function voiceKey() { try { const v = localStorage.getItem("thy-vsel"); return VOICES[v] ? v : "auto"; } catch (e) { return "auto"; } }
 function bargeOn() { try { return localStorage.getItem("thy-barge") !== "0"; } catch (e) { return true; } }
 var aiAudio = new Audio(), spkTok = 0, bargeStream = null, bargeTimer = null, bargeCtx = null;
 aiAudio.setAttribute("playsinline", "");
@@ -917,25 +933,30 @@ function playB64(b64, tok) {
     aiAudio.src = "data:audio/mpeg;base64," + b64; aiAudio.play().catch(() => res());
   });
 }
-async function speak(text, after) {
+function splitSpeech(t) { const p = (t || "").match(/[^.!?…]+[.!?…]*\s*/g) || (t ? [t] : []); return p.length > 1 ? [p[0].trim(), p.slice(1).join("").trim()].filter(Boolean) : p.map(x => x.trim()).filter(Boolean); }
+async function speak(text, after, opts) {
+  opts = opts || {};
   stopSpeaking(); const tok = ++spkTok;
-  const clean = cleanSpeech(text); if (!clean) { after && after(); return; }
+  const clean = cleanSpeech(text); if (!clean) { opts.onStart && opts.onStart(); after && after(); return; }
   setMic("talk"); startBarge(tok);
-  const vk = voiceKey();
+  const vk = voiceKey(); let started = false; const go = () => { if (!started) { started = true; opts.onStart && opts.onStart(); } };
   try {
-    if (vk === "device") await speakDevice(clean, tok);
+    if (vk === "device") { go(); await speakDevice(clean, tok); }
     else {
-      const parts = clean.match(/[^.!?…]+[.!?…]*\s*/g) || [clean];
-      const chunks = parts.length > 1 ? [parts[0], parts.slice(1).join("")] : [clean];
-      const reqs = chunks.map(c => callAI({ mode: "tts", text: c.trim(), voice: VOICES[vk][0] }).catch(() => null));
+      let chunks, reqs;
+      if (opts.audio0) { chunks = [null, ...splitSpeech(cleanSpeech(opts.rest || ""))]; reqs = [Promise.resolve({ audio: opts.audio0 })]; }
+      else { chunks = splitSpeech(clean); reqs = []; }
+      for (let k = reqs.length; k < chunks.length; k++) reqs.push(callAI({ mode: "tts", text: chunks[k], voice: VOICES[vk][0] }).catch(() => null));
       for (let k = 0; k < chunks.length; k++) {
-        if (tok !== spkTok) return;
+        if (tok !== spkTok) { go(); return; }
         const rr = await reqs[k];
-        if (tok !== spkTok) return;
-        if (rr && rr.audio) await playB64(rr.audio, tok); else await speakDevice(chunks[k], tok);
+        if (tok !== spkTok) { go(); return; }
+        go();
+        if (rr && rr.audio) await playB64(rr.audio, tok); else if (chunks[k]) await speakDevice(chunks[k], tok);
       }
     }
   } catch (e) {}
+  go();
   if (tok !== spkTok) return; // coupé par l'utilisateur
   const st = bargeStream; bargeStream = null; stopBarge(false);
   setMic("");
