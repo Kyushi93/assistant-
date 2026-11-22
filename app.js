@@ -503,7 +503,12 @@ seed(); try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {}
 renderAll();
 let lastDay = TODAY();
 setInterval(() => { if (TODAY() !== lastDay) { lastDay = TODAY(); hd.value = lastDay; renderAll(); } else renderToday(); }, 60000);
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { swReg = r; }).catch(e => console.warn(e));
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => { swReg = r; try { r.update(); } catch (e) {} }).catch(e => console.warn(e));
+  let reloaded = false; const hadCtrl = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadCtrl && !reloaded) { reloaded = true; location.reload(); } });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && swReg) { try { swReg.update(); } catch (e) {} } });
+}
 initCloud();
 function loadNews() { fetch("news.json?ts=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.json() : []).then(j => { NEWS = Array.isArray(j) ? j : (j.items || []); renderAll(); }).catch(() => {}); }
 loadNews();
@@ -839,8 +844,8 @@ async function sendChat(text) {
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis</h2><button class="btn sec" data-close>Fermer</button></div>
-    <div id="ai-log"><div class="msg bot">Salut boss ! Touche le micro et parle-moi : planning, évals, révisions… ou dis-moi ce que tu as mangé, bu ou révisé, je note tout.</div></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v17</small></h2><button class="btn sec" data-close>Fermer</button></div>
+    <div id="ai-log"><div class="msg bot">Bonjour boss. Touchez le micro et parlez-moi : planning, évals, révisions… ou dites-moi ce que vous avez mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
     <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
     <form id="ai-form" class="row nowrap"><input id="ai-in" placeholder="Ou écris ta question…" autocomplete="off"><button class="btn teal">➤</button></form></div>`;
@@ -865,23 +870,25 @@ function pickVoice() {
   const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
   return v.find(x => /thomas|daniel|nicolas|henri|paul/i.test(x.name)) || v.find(x => /fr-FR/i.test(x.lang)) || v[0] || null;
 }
-const VOICES = { oliver: ["8169ab87-bc99-4669-a5ec-6855860ace24", "Oliver · britannique, style Jarvis"], oliver2: ["e3596645-b1af-469e-b857-f18ddedc7652", "Oliver calme · britannique"], paul: ["98559b22-62b5-4a64-a7cd-fc78ca41faa8", "Paul · américain"], marie: ["5a271406-039d-46fe-835b-fbbb00eaf08d", "Marie · française"], device: ["", "Voix du téléphone (hors ligne)"] };
-function voiceKey() { try { const v = localStorage.getItem("thy-vsel"); return VOICES[v] ? v : "oliver"; } catch (e) { return "oliver"; } }
+const VOICES = { pierre: ["ref:pierre", "Pierre · français, posé (majordome)"], tom: ["ref:tom", "Tom · français, plus jeune"], marie: ["5a271406-039d-46fe-835b-fbbb00eaf08d", "Marie · française"], device: ["", "Voix du téléphone (hors ligne)"] };
+function voiceKey() { try { const v = localStorage.getItem("thy-vsel"); return VOICES[v] ? v : "pierre"; } catch (e) { return "pierre"; } }
 function bargeOn() { try { return localStorage.getItem("thy-barge") !== "0"; } catch (e) { return true; } }
 var aiAudio = new Audio(), spkTok = 0, bargeStream = null, bargeTimer = null, bargeCtx = null;
 aiAudio.setAttribute("playsinline", "");
 const SILENT = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
-function unlockAudio() { try { aiAudio.src = SILENT; aiAudio.play().catch(() => {}); } catch (e) {} try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }
+var sharedCtx = null;
+function getCtx() { try { if (!sharedCtx) sharedCtx = new (window.AudioContext || window.webkitAudioContext)(); if (sharedCtx.state === "suspended") sharedCtx.resume(); } catch (e) {} return sharedCtx; }
+function unlockAudio() { getCtx(); try { aiAudio.src = SILENT; aiAudio.play().catch(() => {}); } catch (e) {} try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }
 function cleanSpeech(t) { return String(t).replace(/\*\*/g, "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").replace(/\s+/g, " ").trim(); }
 function stopSpeaking() { spkTok++; try { aiAudio.pause(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {} stopBarge(true); }
-function stopBarge(killStream) { clearInterval(bargeTimer); bargeTimer = null; try { bargeCtx && bargeCtx.close(); } catch (e) {} bargeCtx = null; if (killStream && bargeStream) { try { bargeStream.getTracks().forEach(t => t.stop()); } catch (e) {} bargeStream = null; } }
+function stopBarge(killStream) { clearInterval(bargeTimer); bargeTimer = null; try { bargeCtx && bargeCtx.disconnect(); } catch (e) {} bargeCtx = null; if (killStream && bargeStream) { try { bargeStream.getTracks().forEach(t => t.stop()); } catch (e) {} bargeStream = null; } }
 async function startBarge(tok) {
   if (!bargeOn() || !convo || !navigator.mediaDevices) return;
   try { bargeStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch (e) { return; }
   if (tok !== spkTok) { stopBarge(true); return; }
   try {
-    bargeCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const an = bargeCtx.createAnalyser(); an.fftSize = 2048; bargeCtx.createMediaStreamSource(bargeStream).connect(an);
+    const bc = getCtx(); bargeCtx = bc.createMediaStreamSource(bargeStream);
+    const an = bc.createAnalyser(); an.fftSize = 2048; bargeCtx.connect(an);
     const buf = new Float32Array(an.fftSize); let floor = 0, n = 0, hot = 0; const t0 = Date.now();
     bargeTimer = setInterval(() => {
       an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; const rms = Math.sqrt(s / buf.length);
@@ -954,7 +961,7 @@ async function listen(existing) {
   rec.onstop = async () => {
     clearInterval(recTimer);
     try { recStream.getTracks().forEach(t => t.stop()); } catch (e) {}
-    try { recCtx && recCtx.close(); } catch (e) {}
+    try { recCtx && recCtx.disconnect(); } catch (e) {}
     $("ai-mic").style.setProperty("--lv", 0);
     if (recCancel || !chunks.length) { setMic(""); return; }
     const blob = new Blob(chunks, { type: rec.mimeType || mime || "audio/webm" });
@@ -973,21 +980,22 @@ async function listen(existing) {
   setMic("rec", manual ? "Je t'écoute… touche le micro quand tu as fini" : "Je t'écoute… prends ton temps (touche pour envoyer)");
   // détection de fin de phrase : on attend un vrai silence (2,3 s) avant d'envoyer
   try {
-    recCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = recCtx.createMediaStreamSource(recStream), an = recCtx.createAnalyser(); an.fftSize = 2048; src.connect(an);
-    const buf = new Float32Array(an.fftSize); let floor = 0, n = 0, voiced = 0, spoke = false, quiet = 0; const t0 = Date.now();
+    const cx = getCtx(); recCtx = cx.createMediaStreamSource(recStream); const an = cx.createAnalyser(); an.fftSize = 2048; recCtx.connect(an);
+    const buf = new Float32Array(an.fftSize); let voiced = 0, spoke = false, quiet = 0, maxr = 0; const hist = []; const t0 = Date.now();
     recTimer = setInterval(() => {
       an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; const rms = Math.sqrt(s / buf.length);
       const el = Date.now() - t0;
-      if (el < 500) { floor += rms; n++; return; }
-      if (n) { floor = floor / n; n = 0; }
-      const on = Math.max(0.006, floor * 2.2), off = Math.max(0.004, floor * 1.5);
-      $("ai-mic").style.setProperty("--lv", Math.min(1, rms / (on * 3)).toFixed(2));
-      if (rms > on) { voiced += 100; quiet = 0; if (voiced >= 300) spoke = true; }
-      else { if (rms < off) { quiet += 100; floor = floor * 0.97 + rms * 0.03; } voiced = 0; }
+      hist.push(rms); if (hist.length > 40) hist.shift(); maxr = Math.max(maxr, rms);
+      const srt = hist.slice().sort((x, y) => x - y), floor = srt[Math.floor(srt.length * 0.15)] || 0;
+      const on = floor * 2 + 0.004, off = floor * 1.4 + 0.003;
+      $("ai-mic").style.setProperty("--lv", Math.min(1, rms / (on * 3 + 1e-6)).toFixed(2));
+      if (el < 300) return;
+      if (rms > on) { voiced += 100; quiet = 0; if (voiced >= 250) spoke = true; }
+      else { voiced = 0; if (rms < off || !spoke) quiet += 100; }
       if (manual) { if (el > 120000) stopListen(false); return; }
-      if ((spoke && quiet >= 2300 && el > 1800) || el > 60000) stopListen(false);
-      else if (!spoke && el > 12000) { recCancel = true; stopListen(false); setMic("", "Je n'ai rien entendu 🙂"); convo = false; }
+      // fin de phrase : 2 s de silence après avoir parlé ; sinon on envoie quand même (la transcription tranchera)
+      if ((spoke && quiet >= 2000 && el > 1500) || el > 60000) stopListen(false);
+      else if (!spoke && el > 9000) { if (maxr < 0.0005) { stopListen(false); } else if (quiet >= 9000) { recCancel = true; stopListen(false); setMic("", "Je n'ai rien entendu 🙂"); convo = false; } }
     }, 100);
   } catch (e) {}
 }
@@ -995,7 +1003,7 @@ async function listen(existing) {
   const cb = $("ai-voice"); if (cb) { cb.checked = voiceOn(); cb.onchange = () => { try { localStorage.setItem("thy-voice", cb.checked ? "1" : "0"); } catch (e) {} if (!cb.checked) { convo = false; try { speechSynthesis.cancel(); } catch (e) {} } }; }
   const bg = $("ai-barge"); if (bg) { bg.checked = bargeOn(); bg.onchange = () => { try { localStorage.setItem("thy-barge", bg.checked ? "1" : "0"); } catch (e) {} }; }
   const vs = $("ai-vsel"); if (vs) { vs.innerHTML = Object.entries(VOICES).map(([k, v]) => `<option value="${k}">🎧 ${v[1]}</option>`).join(""); vs.value = voiceKey(); vs.onchange = () => { try { localStorage.setItem("thy-vsel", vs.value); } catch (e) {} }; }
-  const vt = $("ai-vtest"); if (vt) vt.onclick = () => { unlockAudio(); convo = false; speak("Bonjour boss. Je suis Jarvis, ton assistant. Tu as trois évals cette semaine, on s'organise ?"); };
+  const vt = $("ai-vtest"); if (vt) vt.onclick = () => { unlockAudio(); convo = false; speak("Bonjour boss. Jarvis, à votre service. Vous avez plusieurs évaluations cette semaine : souhaitez-vous que je vous prépare un planning de révision ?"); };
   const mc = $("ai-manual"); if (mc) { mc.checked = manualMode(); mc.onchange = () => { try { localStorage.setItem("thy-manual", mc.checked ? "1" : "0"); } catch (e) {} }; }
   const b = $("ai-mic"); if (!b) return;
   b.onclick = () => {
