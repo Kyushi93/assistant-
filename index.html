@@ -263,6 +263,14 @@ nav.bottom button{min-width:0}
 [data-theme=dark] .sheet{background:rgba(0,0,0,.6)}
 [data-theme=dark] .toast{background:#E7EEEA;color:#0E1413}
 [data-theme=dark] .wday .wh{color:var(--ink)}[data-theme=dark] .wday.today .wh{color:var(--teal)}
+/* Barre du bas flottante (mobile) */
+@media(max-width:899px){
+  nav.bottom{position:fixed!important;left:12px;right:12px;bottom:calc(max(var(--sb) - 18px, 8px));order:0;padding:6px;border:1px solid var(--line);border-radius:26px;box-shadow:0 10px 30px rgba(22,33,31,.18),0 2px 8px rgba(22,33,31,.08);background:rgba(255,255,255,.88)}
+  nav.bottom button{border-radius:20px;padding:7px 0}
+  #scroller{padding-bottom:calc(96px + max(var(--sb) - 18px, 8px))}
+  [data-theme=dark] nav.bottom{background:rgba(24,33,31,.9);box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04)}
+  [data-theme=dark] nav.bottom button.on{background:#2A3734}
+}
 </style>
 </head>
 <body>
