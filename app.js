@@ -749,7 +749,7 @@ async function analyseDish(text) {
   const r = await callAI({ mode: "dish", text });
   try { await loadFood(); } catch (e) {}
   const ing = (r.ingredients || []).filter(x => x && x.nom && x.g > 0).map(x => {
-    const g = Math.round(+x.g), ai = { k: (+x.kcal || 0) / g * 100, p: (+x.p || 0) / g * 100, c: (+x.c || 0) / g * 100, f: (+x.f || 0) / g * 100 };
+    const nb0 = Math.max(0.5, +r.nb || 1), g1 = Math.max(1, Math.round(+x.g)), g = Math.round(g1 * nb0), ai = { k: (+x.kcal || 0) / g1 * 100, p: (+x.p || 0) / g1 * 100, c: (+x.c || 0) / g1 * 100, f: (+x.f || 0) / g1 * 100 };
     let per = ai, src = "estimation IA";
     const m = FOOD ? searchFood(x.nom)[0] : null;
     if (m && (ai.k < 5 ? m.k < 40 : m.k > ai.k / 3 && m.k < ai.k * 3)) { per = { k: m.k, p: m.p, c: m.c, f: m.f }; src = "Ciqual · " + m.n; }
@@ -842,7 +842,7 @@ async function sendChat(text) {
   sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Assistant</h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Salut Thyvan ! Pose-moi une question sur ton planning, tes évals, ou dis-moi ce que tu as mangé, bu, révisé… je le note pour toi.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
-    <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label></div>
+    <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
     <form id="ai-form" class="row nowrap"><input id="ai-in" placeholder="Ou écris ta question…" autocomplete="off"><button class="btn teal">➤</button></form></div>`;
   document.body.appendChild(sh);
   sh.onclick = e => { if (e.target === sh || e.target.closest("[data-close]")) { sh.classList.remove("on"); convo = false; stopListen(true); try { speechSynthesis.cancel(); } catch (er) {} } };
@@ -859,7 +859,7 @@ function voiceOn() { try { return localStorage.getItem("thy-voice") !== "0"; } c
 function setMic(state, label) {
   const b = $("ai-mic"); if (!b) return;
   b.className = state || "";
-  $("ai-mic-lbl").textContent = label || (state === "rec" ? "Je t'écoute… (touche pour arrêter)" : state === "busy" ? "Je réfléchis…" : state === "talk" ? "Je parle… (touche pour couper)" : "Touche pour parler");
+  $("ai-mic-lbl").textContent = label || (state === "rec" ? "Je t'écoute… (touche pour arrêter)" : state === "busy" ? "Je réfléchis…" : state === "talk" ? "Je parle… touche pour me couper et parler" : "Touche pour parler");
 }
 function pickVoice() {
   const v = speechSynthesis.getVoices().filter(x => /^fr/i.test(x.lang));
@@ -881,18 +881,21 @@ function stopListen(cancel) {
   try { if (rec && rec.state !== "inactive") rec.stop(); } catch (e) {}
   if (cancel) { try { recStream && recStream.getTracks().forEach(t => t.stop()); } catch (e) {} setMic(""); }
 }
+function manualMode() { try { return localStorage.getItem("thy-manual") === "1"; } catch (e) { return false; } }
 async function listen() {
   if (rec && rec.state === "recording") return;
   if (!navigator.mediaDevices || !window.MediaRecorder) { setMic("", "Micro non disponible ici : utilise la dictée du clavier 🎤"); return; }
-  try { recStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  try { recStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
   catch (e) { setMic("", "Autorise le micro pour me parler (réglages du navigateur)."); convo = false; return; }
   const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"].find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
   rec = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined);
   const chunks = []; recCancel = false;
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   rec.onstop = async () => {
+    clearInterval(recTimer);
     try { recStream.getTracks().forEach(t => t.stop()); } catch (e) {}
     try { recCtx && recCtx.close(); } catch (e) {}
+    $("ai-mic").style.setProperty("--lv", 0);
     if (recCancel || !chunks.length) { setMic(""); return; }
     const blob = new Blob(chunks, { type: rec.mimeType || mime || "audio/webm" });
     if (blob.size < 2500) { setMic(""); convo = false; return; }
@@ -905,28 +908,36 @@ async function listen() {
       setMic("busy"); await sendChat(t); if (!voiceOn()) setMic("");
     } catch (e) { setMic("", aiErr(e)); convo = false; }
   };
-  rec.start(250); setMic("rec");
-  // détection de silence : arrêt auto quand tu as fini de parler
+  rec.start(250);
+  const manual = manualMode();
+  setMic("rec", manual ? "Je t'écoute… touche le micro quand tu as fini" : "Je t'écoute… prends ton temps (touche pour envoyer)");
+  // détection de fin de phrase : on attend un vrai silence (2,3 s) avant d'envoyer
   try {
     recCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = recCtx.createMediaStreamSource(recStream), an = recCtx.createAnalyser(); an.fftSize = 1024; src.connect(an);
-    const buf = new Float32Array(an.fftSize); let floor = 0, n = 0, spoke = false, quiet = 0; const t0 = Date.now();
+    const src = recCtx.createMediaStreamSource(recStream), an = recCtx.createAnalyser(); an.fftSize = 2048; src.connect(an);
+    const buf = new Float32Array(an.fftSize); let floor = 0, n = 0, voiced = 0, spoke = false, quiet = 0; const t0 = Date.now();
     recTimer = setInterval(() => {
       an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; const rms = Math.sqrt(s / buf.length);
       const el = Date.now() - t0;
-      if (el < 400) { floor += rms; n++; return; }
-      const th = Math.max(0.015, (floor / Math.max(1, n)) * 2.8);
-      if (rms > th) { spoke = true; quiet = 0; } else quiet += 100;
-      if ((spoke && quiet >= 1400) || el > 30000 || (!spoke && el > 8000)) { if (!spoke) recCancel = true; stopListen(false); if (!spoke) { setMic("", "Je n'ai rien entendu 🙂"); convo = false; } }
+      if (el < 500) { floor += rms; n++; return; }
+      if (n) { floor = floor / n; n = 0; }
+      const on = Math.max(0.006, floor * 2.2), off = Math.max(0.004, floor * 1.5);
+      $("ai-mic").style.setProperty("--lv", Math.min(1, rms / (on * 3)).toFixed(2));
+      if (rms > on) { voiced += 100; quiet = 0; if (voiced >= 300) spoke = true; }
+      else { if (rms < off) { quiet += 100; floor = floor * 0.97 + rms * 0.03; } voiced = 0; }
+      if (manual) { if (el > 120000) stopListen(false); return; }
+      if ((spoke && quiet >= 2300 && el > 1800) || el > 60000) stopListen(false);
+      else if (!spoke && el > 12000) { recCancel = true; stopListen(false); setMic("", "Je n'ai rien entendu 🙂"); convo = false; }
     }, 100);
   } catch (e) {}
 }
 (function () {
   const cb = $("ai-voice"); if (cb) { cb.checked = voiceOn(); cb.onchange = () => { try { localStorage.setItem("thy-voice", cb.checked ? "1" : "0"); } catch (e) {} if (!cb.checked) { convo = false; try { speechSynthesis.cancel(); } catch (e) {} } }; }
+  const mc = $("ai-manual"); if (mc) { mc.checked = manualMode(); mc.onchange = () => { try { localStorage.setItem("thy-manual", mc.checked ? "1" : "0"); } catch (e) {} }; }
   const b = $("ai-mic"); if (!b) return;
   b.onclick = () => {
     try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {}
-    if (b.classList.contains("talk")) { try { speechSynthesis.cancel(); } catch (e) {} convo = false; setMic(""); return; }
+    if (b.classList.contains("talk")) { try { speechSynthesis.cancel(); } catch (e) {} convo = voiceOn(); listen(); return; }
     if (rec && rec.state === "recording") { stopListen(false); return; }
     if (b.classList.contains("busy")) return;
     convo = voiceOn(); listen();
