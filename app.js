@@ -229,7 +229,7 @@ function renderGymWeek(id) {
 }
 
 /* ---------- TÂCHES ---------- */
-const CAT = { etudes: ["Études", "p-blue"], perso: ["Perso", "p-violet"], sante: ["Santé", "p-teal"], admin: ["Admin", "p-gold"] };
+const CAT = { etudes: ["Études", "p-blue"], perso: ["Perso", "p-violet"], projet: ["Projets", "p-coral"], sante: ["Santé", "p-teal"], admin: ["Admin", "p-gold"] };
 function taskHTML(x) {
   const c = CAT[x.c] || CAT.perso, late = x.d && !x.done && x.d < TODAY();
   return `<div class="item ${x.done ? "done" : ""}"><button class="chk ${x.done ? "on" : ""}" data-tk="${x.id}" aria-label="Cocher"></button><div><div class="t">${esc(x.t)}</div>
@@ -865,7 +865,7 @@ async function sendChat(text) {
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v21</small></h2><button class="btn sec" data-close>Fermer</button></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v22</small></h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Bonjour boss. Touchez le micro et parlez-moi : planning, évals, révisions… ou dites-moi ce que vous avez mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
     <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
@@ -1076,3 +1076,60 @@ function bulkPanel() {
     <div class="bphase"><div class="${phase === "bulk" ? "on" : ""}"><b>1. Prise de masse</b>jusqu'au 6 juin · +${String(G.wrate).replace(".", ",")} kg/sem</div><div class="${phase === "cut" ? "on" : ""}"><b>2. Sèche légère</b>7 juin → fin juillet, pour être sec</div></div>
     <div class="small">${a1 != null ? `Poids moyen cette semaine : <b>${a1.toFixed(1).replace(".", ",")} kg</b>. ` : ""}${adv}</div></div>`;
 }
+
+/* ===== v22 : série, courbe 30 jours, bilan du jour (repris du projet Lock In) ===== */
+// Une journée est « réussie » quand au moins 3 habitudes sur 5 sont tenues (60 %).
+const HABITS = [
+  ["💧", "Eau", (d, G) => (d.water || 0) / 1000 >= G.water],
+  ["😴", "Sommeil", (d, G) => +d.sleep > 0 && +d.sleep >= G.sleep - 0.5],
+  ["🏋️", "Sport noté", d => !!d.gym],
+  ["🥩", "Protéines", (d, G) => dayMacros(d).p >= G.prot * 0.9],
+  ["📚", "Révision", (d, G) => (+d.study || 0) >= G.study]
+];
+function habitScore(s) { const d = S.days[s] || {}, G = goals(); const ok = HABITS.map(h => h[2](d, G)); return { ok, n: ok.filter(Boolean).length, pct: ok.filter(Boolean).length / HABITS.length * 100 }; }
+const dayWon = s => habitScore(s).pct >= 60;
+function streakNow() {
+  let x = TODAY(), n = 0;
+  if (!dayWon(x)) x = addD(x, -1); // la journée en cours ne casse pas la série
+  while (n < 400 && dayWon(x)) { n++; x = addD(x, -1); }
+  return n;
+}
+function bestStreak(days) { let best = 0, cur = 0; for (let i = days - 1; i >= 0; i--) { if (dayWon(addD(TODAY(), -i))) { cur++; best = Math.max(best, cur); } else cur = 0; } return best; }
+function lineSvg(vals, labels) {
+  const W = 320, H = 150, pb = 22, pt = 14, n = vals.length, x = i => 8 + i * (W - 16) / Math.max(1, n - 1), y = v => pt + (H - pb - pt) * (1 - v / 100);
+  let s = `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" preserveAspectRatio="none">`;
+  s += `<line x1="0" x2="${W}" y1="${y(60)}" y2="${y(60)}" class="gline"/><text x="2" y="${y(60) - 3}" class="ctxt gtxt">🎯 60 %</text>`;
+  s += `<polyline points="${vals.map((v, i) => x(i) + "," + y(v)).join(" ")}" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  vals.forEach((v, i) => { s += `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${v >= 60 ? "var(--teal)" : "var(--coral)"}"/>`; if (i % 5 === 4 || i === n - 1) s += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" class="ctxt">${labels[i]}</text>`; });
+  return s + `</svg>`;
+}
+function bilanText() {
+  const t = TODAY(), d = S.days[t] || {}, G = goals(), m = dayMacros(d), x = parse(t), hs = habitScore(t);
+  const tk = S.tasks.filter(k => k.d === t), tkDone = tk.filter(k => k.done).length;
+  const gym = d.gym ? (GYM.find(g => g[0] === d.gym) || [, d.gym])[1] : "rien noté";
+  return [`Bilan du ${JOURS[x.getDay()]} ${x.getDate()} ${MC[x.getMonth()]} — ${hs.n}/5 habitudes, série ${streakNow()} j`,
+    `💧 Eau ${fmtL(d.water || 0)} / ${String(G.water).replace(".", ",")} L`,
+    `😴 Sommeil ${d.sleep ? d.sleep + " h" : "non noté"}`,
+    `🏋️ Sport : ${gym}`,
+    `🍽️ ${m.n ? Math.round(m.kcal) + " kcal · " + Math.round(m.p) + " g protéines" : "repas non notés"}`,
+    `📚 Révision ${fmtMin(+d.study || 0)} / ${fmtMin(G.study)}`,
+    `✅ Tâches du jour ${tk.length ? tkDone + "/" + tk.length : "aucune"}`].join("\n");
+}
+function renderStreak() {
+  const el = $("stat-streak"); if (!el) return;
+  const ds = lastDays(30), vals = ds.map(s => habitScore(s).pct), won = ds.filter(dayWon).length;
+  const now = streakNow(), best = bestStreak(90), today = habitScore(TODAY());
+  el.innerHTML = `<h3>🔥 Ma série</h3><div class="kpi"><div><span class="lbl">Série actuelle</span><b>${now} j</b></div><div><span class="lbl">Record (90 j)</span><b>${best} j</b></div><div><span class="lbl">Jours réussis (30 j)</span><b>${won}/30 · ${Math.round(won / 30 * 100)}%</b></div></div>
+    <div class="row small" style="margin:10px 0 2px;gap:6px">${HABITS.map((h, i) => `<span class="pill ${today.ok[i] ? "p-teal" : "p-grey"}">${h[0]} ${h[1]}</span>`).join("")}</div>
+    <div class="small muted">Aujourd'hui : ${today.n}/5. Une journée compte dans la série à partir de 3 habitudes sur 5.</div>
+    <div class="lbl" style="margin-top:10px">Habitudes tenues · 30 derniers jours</div>${lineSvg(vals, ds.map(s => parse(s).getDate() + ""))}
+    <div class="row" style="margin-top:8px"><button class="btn sec" id="bilan-copy" type="button">📋 Copier le bilan du jour</button></div>`;
+}
+document.body.addEventListener("click", async e => {
+  if (!e.target.closest("#bilan-copy")) return;
+  const txt = bilanText();
+  try { await navigator.clipboard.writeText(txt); toast("Bilan copié 📋"); }
+  catch (err) { const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("Bilan copié 📋"); } catch (e2) { toast("Copie impossible"); } ta.remove(); }
+});
+{ const _ra2 = renderAll; renderAll = function () { _ra2(); renderStreak(); }; }
+renderStreak();
