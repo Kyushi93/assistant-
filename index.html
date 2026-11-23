@@ -487,6 +487,7 @@ nav.bottom button{min-width:0}
 <section class="view" id="v-stats">
   <div class="row" style="justify-content:space-between;margin-bottom:12px"><h2 style="font-size:24px">📊 Mes stats</h2><div class="seg" id="stat-period"><button data-n="7" class="on">7 jours</button><button data-n="30">30 jours</button></div></div>
   <div class="card" id="stat-global"></div>
+  <div class="card mt" id="stat-streak"></div>
   <div class="card mt" id="stat-sys"></div>
   <div class="grid g2 mt">
     <div class="card" id="stat-water"></div>
@@ -505,7 +506,7 @@ nav.bottom button{min-width:0}
       <h3>➕ Nouvelle tâche</h3>
       <form id="task-form" class="grid" style="gap:8px">
         <input id="tk-title" placeholder="Ex. Justifier mon absence UE 5.8" required>
-        <div class="row nowrap"><input type="date" id="tk-date"><select id="tk-cat"><option value="etudes">Études</option><option value="perso">Perso</option><option value="sante">Santé</option><option value="admin">Admin</option></select></div>
+        <div class="row nowrap"><input type="date" id="tk-date"><select id="tk-cat"><option value="etudes">Études</option><option value="perso">Perso</option><option value="projet">Projets perso</option><option value="sante">Santé</option><option value="admin">Admin</option></select></div>
         <button class="btn teal">Ajouter</button>
       </form>
     </div>
