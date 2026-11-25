@@ -13,12 +13,13 @@ async function mistral(messages: unknown[], json = true) {
   throw new Error(last);
 }
 // ---- Gemini (gratuit) ----
-// Vrais modèles (nov. 2026). 3.5 Flash / Flash-Lite acceptent thinkingLevel "minimal" = quasi pas de réflexion = rapide.
-// 3.6 Flash n'accepte que medium/high : on le garde en secours sans réglage.
-const GEM_FAST = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest"];
-const GEM_LITE = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"];
-const MINIMAL_OK = new Set(["gemini-3.5-flash", "gemini-3.5-flash-lite"]);
+// Testé le 25/11/2026 avec la clé gratuite : 3-flash-preview répond en ~1 s ; 3.5-flash / 3.6-flash / flash-latest = quota gratuit épuisé (429) ;
+// les flash-lite sont souvent saturés (503). Réflexion "minimal" = quasi pas de réflexion = rapide.
+const GEM_FAST = ["gemini-3-flash-preview", "gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+const GEM_LITE = GEM_FAST;
+const MINIMAL_OK = new Set(["gemini-3-flash-preview", "gemini-flash-lite-latest", "gemini-3.5-flash", "gemini-3.5-flash-lite"]);
 const DEAD = new Set<string>(); // modèles introuvables (404) : on ne les retente plus
+const COOL: Record<string, number> = {}; // quota épuisé (429) : on saute le modèle 10 min
 let LAST_OK = ""; // dernier modèle qui a répondu : essayé en premier
 async function gemini(messages: any[], json = true, extraParts: unknown[] = [], lite = false) {
   const key = Deno.env.get("GEMINI_API_KEY"); if (!key) throw new Error("no gemini");
@@ -26,14 +27,16 @@ async function gemini(messages: any[], json = true, extraParts: unknown[] = [], 
   const contents = messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content ?? "") }] }));
   if (extraParts.length) contents.push({ role: "user", parts: extraParts as any });
   const base = lite ? GEM_LITE : GEM_FAST;
-  const order = (!lite && LAST_OK && base.includes(LAST_OK) ? [LAST_OK, ...base.filter((m) => m !== LAST_OK)] : base).filter((m) => !DEAD.has(m));
+  const all = (LAST_OK && base.includes(LAST_OK) ? [LAST_OK, ...base.filter((m) => m !== LAST_OK)] : base).filter((m) => !DEAD.has(m));
+  const fresh = all.filter((m) => !(COOL[m] > Date.now()));
+  const order = fresh.length ? fresh : all;
   let last = "";
   const t0 = Date.now();
   for (let pass = 0; pass < 2; pass++) {
     let busy = false;
     for (const model of order) {
-      if (Date.now() - t0 > 30000) throw new Error(last || "gemini trop lent");
-      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 15000);
+      if (Date.now() - t0 > 25000) throw new Error(last || "gemini trop lent");
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 10000);
       let r: Response;
       try {
         r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -49,8 +52,8 @@ async function gemini(messages: any[], json = true, extraParts: unknown[] = [], 
       if (r.ok) {
         const j = await r.json();
         const t = (j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
-        if (t && json) { try { JSON.parse(t); if (!lite) LAST_OK = model; return t as string; } catch (_e) { last = "gemini json invalide"; continue; } }
-        if (t) { if (!lite) LAST_OK = model; return t as string; }
+        if (t && json) { try { JSON.parse(t); LAST_OK = model; return t as string; } catch (_e) { last = "gemini json invalide"; continue; } }
+        if (t) { LAST_OK = model; return t as string; }
         last = "gemini vide " + JSON.stringify(j).slice(0, 200);
         continue;
       }
@@ -58,6 +61,7 @@ async function gemini(messages: any[], json = true, extraParts: unknown[] = [], 
       if (r.status === 404) { DEAD.add(model); continue; }
       if (r.status === 400 && /API key/i.test(last)) throw new Error(last);
       if (r.status === 401 || r.status === 403) throw new Error(last);
+      if (r.status === 429 && /quota/i.test(last)) { COOL[model] = Date.now() + 600000; if (LAST_OK === model) LAST_OK = ""; continue; }
       if (r.status === 429 || r.status >= 500) busy = true;
     }
     if (!busy) break; // erreurs définitives : inutile de refaire un tour
