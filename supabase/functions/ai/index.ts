@@ -1,4 +1,4 @@
-// IA de l'assistant (Mistral) — clé gardée dans les secrets Supabase
+// IA de l'assistant (Gemini, Mistral en secours) — clés gardées dans les secrets Supabase
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const J = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 
@@ -11,6 +11,42 @@ async function mistral(messages: unknown[], json = true) {
     if (r.status === 401) break;
   }
   throw new Error(last);
+}
+// ---- Gemini (gratuit) ----
+const GEM_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite"];
+async function gemini(messages: any[], json = true, extraParts: unknown[] = []) {
+  const key = Deno.env.get("GEMINI_API_KEY"); if (!key) throw new Error("no gemini");
+  const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const contents = messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content ?? "") }] }));
+  if (extraParts.length) contents.push({ role: "user", parts: extraParts as any });
+  let last = "";
+  for (const model of GEM_MODELS) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        ...(sys ? { systemInstruction: { parts: [{ text: sys }] } } : {}),
+        contents,
+        generationConfig: { temperature: 0.2, ...(json ? { responseMimeType: "application/json" } : {}) },
+      }),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      const t = (j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join("");
+      if (t) return t as string;
+      last = "gemini vide " + JSON.stringify(j).slice(0, 200);
+      continue;
+    }
+    last = "gemini " + r.status + " " + (await r.text()).slice(0, 200);
+    if (r.status === 400 && /API key/i.test(last)) break;
+    if (r.status === 401 || r.status === 403) break;
+  }
+  throw new Error(last);
+}
+// Essaie Gemini, puis Mistral
+async function llm(messages: any[], json = true) {
+  try { return await gemini(messages, json); }
+  catch (e) { try { return await mistral(messages, json); } catch (e2) { throw new Error(String(e) + " | " + String(e2)); } }
 }
 async function call(model: string, messages: unknown[], json: boolean) {
   return await fetch("https://api.mistral.ai/v1/chat/completions", {
@@ -97,7 +133,7 @@ Deno.serve(async (req) => {
   try {
     const b = await req.json();
     if (b.mode === "dish") {
-      const out = JSON.parse(await mistral([{ role: "system", content: DISH }, { role: "user", content: String(b.text).slice(0, 300) }]));
+      const out = JSON.parse(await llm([{ role: "system", content: DISH }, { role: "user", content: String(b.text).slice(0, 300) }]));
       return J(out);
     }
     if (b.mode === "voices") {
@@ -110,6 +146,10 @@ Deno.serve(async (req) => {
     if (b.mode === "stt") {
       const bin = Uint8Array.from(atob(String(b.audio)), (ch) => ch.charCodeAt(0));
       const ext = /mp4|m4a|aac/.test(b.mime || "") ? "m4a" : /ogg/.test(b.mime || "") ? "ogg" : /wav/.test(b.mime || "") ? "wav" : "webm";
+      try {
+        const t = await gemini([{ role: "system", content: "Transcris exactement cet audio en français, sans rien ajouter. Vocabulaire possible : plats vietnamiens/laotiens (bánh xèo, phở, bò bún, bún bò Huế, bánh mì, larb, khao piak), ostéo, PAO, UE, CC, TD, CM, Aurion, Thyvan. Réponds UNIQUEMENT par le texte transcrit." }], false, [{ inline_data: { mime_type: (b.mime || "audio/webm").split(";")[0], data: String(b.audio) } }]);
+        if (t.trim()) return J({ text: t.trim(), model: "gemini" });
+      } catch (_e) { /* on tente Mistral */ }
       let last = "";
       const BIAS = ["bánh xèo", "phở", "bún bò Huế", "bò bún", "bánh mì", "bún chả", "cơm tấm", "hủ tiếu", "gỏi cuốn", "larb", "khao piak", "lok lak", "pad thaï", "ostéo", "PAO", "UE", "CC", "TD", "CM", "Aurion", "Thyvan"];
       const tries: [string, boolean][] = [["voxtral-mini-latest", true], ["voxtral-mini-latest", false], ["voxtral-mini-transcribe-3", false], ["voxtral-mini-2602", false]];
@@ -140,7 +180,7 @@ ${GLOSS}
 Si le message semble coupé ou incompréhensible, demande gentiment de répéter au lieu d'inventer.
 N'invente pas de cours ni d'évals : utilise seulement le contexte. Si aucune action, "actions": [].`;
       const msgs = [{ role: "system", content: sys }, ...(b.history || []).slice(-10), { role: "user", content: String(b.text).slice(0, 2000) }];
-      const out = JSON.parse(await mistral(msgs));
+      const out = JSON.parse(await llm(msgs));
       if (b.tts && out.reply) {
         const clean = String(out.reply).replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
         const parts = clean.match(/[^.!?…]+[.!?…]*\s*/g) || [clean];
