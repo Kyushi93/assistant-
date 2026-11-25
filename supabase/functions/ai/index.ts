@@ -13,19 +13,27 @@ async function mistral(messages: unknown[], json = true) {
   throw new Error(last);
 }
 // ---- Gemini (gratuit) ----
-const GEM_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"];
-async function gemini(messages: any[], json = true, extraParts: unknown[] = []) {
+// Vrais modèles (nov. 2026). 3.5 Flash / Flash-Lite acceptent thinkingLevel "minimal" = quasi pas de réflexion = rapide.
+// 3.6 Flash n'accepte que medium/high : on le garde en secours sans réglage.
+const GEM_FAST = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest"];
+const GEM_LITE = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"];
+const MINIMAL_OK = new Set(["gemini-3.5-flash", "gemini-3.5-flash-lite"]);
+const DEAD = new Set<string>(); // modèles introuvables (404) : on ne les retente plus
+let LAST_OK = ""; // dernier modèle qui a répondu : essayé en premier
+async function gemini(messages: any[], json = true, extraParts: unknown[] = [], lite = false) {
   const key = Deno.env.get("GEMINI_API_KEY"); if (!key) throw new Error("no gemini");
   const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
   const contents = messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content ?? "") }] }));
   if (extraParts.length) contents.push({ role: "user", parts: extraParts as any });
+  const base = lite ? GEM_LITE : GEM_FAST;
+  const order = (!lite && LAST_OK && base.includes(LAST_OK) ? [LAST_OK, ...base.filter((m) => m !== LAST_OK)] : base).filter((m) => !DEAD.has(m));
   let last = "";
   const t0 = Date.now();
-  // 2 tours : les modèles Google sont parfois saturés (503) quelques secondes
   for (let pass = 0; pass < 2; pass++) {
-    for (const model of GEM_MODELS) {
-      if (Date.now() - t0 > 75000) throw new Error(last || "gemini trop lent");
-      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 30000);
+    let busy = false;
+    for (const model of order) {
+      if (Date.now() - t0 > 30000) throw new Error(last || "gemini trop lent");
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 15000);
       let r: Response;
       try {
         r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -34,23 +42,26 @@ async function gemini(messages: any[], json = true, extraParts: unknown[] = []) 
           body: JSON.stringify({
             ...(sys ? { systemInstruction: { parts: [{ text: sys }] } } : {}),
             contents,
-            generationConfig: { temperature: 0.2, ...(json ? { responseMimeType: "application/json" } : {}), ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: "low" } } : {}) },
+            generationConfig: { ...(json ? { responseMimeType: "application/json" } : {}), ...(MINIMAL_OK.has(model) ? { thinkingConfig: { thinkingLevel: "minimal" } } : {}) },
           }),
         });
-      } catch (_e) { last = "gemini " + model + " délai dépassé"; continue; } finally { clearTimeout(tm); }
+      } catch (_e) { last = "gemini " + model + " délai dépassé"; busy = true; continue; } finally { clearTimeout(tm); }
       if (r.ok) {
         const j = await r.json();
         const t = (j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
-        if (t && json) { try { JSON.parse(t); return t as string; } catch (_e) { last = "gemini json invalide"; continue; } }
-        if (t) return t as string;
+        if (t && json) { try { JSON.parse(t); if (!lite) LAST_OK = model; return t as string; } catch (_e) { last = "gemini json invalide"; continue; } }
+        if (t) { if (!lite) LAST_OK = model; return t as string; }
         last = "gemini vide " + JSON.stringify(j).slice(0, 200);
         continue;
       }
       last = "gemini " + r.status + " " + (await r.text()).slice(0, 200);
+      if (r.status === 404) { DEAD.add(model); continue; }
       if (r.status === 400 && /API key/i.test(last)) throw new Error(last);
       if (r.status === 401 || r.status === 403) throw new Error(last);
+      if (r.status === 429 || r.status >= 500) busy = true;
     }
-    await new Promise((res) => setTimeout(res, 1500));
+    if (!busy) break; // erreurs définitives : inutile de refaire un tour
+    await new Promise((res) => setTimeout(res, 800));
   }
   throw new Error(last);
 }
@@ -142,7 +153,7 @@ Réponds UNIQUEMENT en JSON : {"elements": [{"plat": "vrai nom bien orthographi�
 const num = (v: unknown) => { const n = typeof v === "string" ? parseFloat(v.replace(",", ".")) : Number(v); return isFinite(n) && n >= 0 ? n : NaN; };
 // Open Food Facts : valeurs réelles de l'étiquette (recherche rapide puis fiche produit)
 const norm = (x: string) => x.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/xx:/g, "");
-async function getJSON(u: string, ms = 7000) {
+async function getJSON(u: string, ms = 4000) {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
   try { const r = await fetch(u, { headers: { "User-Agent": "AssistantThyvan/1.0 (perso)" }, signal: ctl.signal }); return r.ok ? await r.json() : null; }
   catch (_e) { return null; } finally { clearTimeout(t); }
@@ -158,8 +169,8 @@ async function offLookup(q: string) {
     const extra = nameW.filter((w: string) => !words.some((x) => w.includes(x) || x.includes(w))).length;
     return { p, sc: match - 0.3 * extra + Math.min(1, (p.unique_scans_n || 0) / 500) * 0.2 };
   }).filter((h: any) => h.p.code && h.sc >= Math.min(2, words.length) - 0.5).sort((a: any, b: any) => b.sc - a.sc).slice(0, 3);
-  for (const h of hits) {
-    const d = await getJSON(`https://world.openfoodfacts.org/api/v2/product/${h.p.code}?fields=product_name,brands,nutriments,serving_quantity`, 6000);
+  const ds = await Promise.all(hits.map((h: any) => getJSON(`https://world.openfoodfacts.org/api/v2/product/${h.p.code}?fields=product_name,brands,nutriments,serving_quantity`, 3500)));
+  for (const d of ds) {
     const n = d?.product?.nutriments; if (!n) continue;
     const k = num(n["energy-kcal_100g"]); if (isNaN(k)) continue;
     const pr = d.product;
@@ -243,7 +254,7 @@ Deno.serve(async (req) => {
       const bin = Uint8Array.from(atob(String(b.audio)), (ch) => ch.charCodeAt(0));
       const ext = /mp4|m4a|aac/.test(b.mime || "") ? "m4a" : /ogg/.test(b.mime || "") ? "ogg" : /wav/.test(b.mime || "") ? "wav" : "webm";
       try {
-        const t = await gemini([{ role: "system", content: "Transcris exactement cet audio en français, sans rien ajouter. Vocabulaire possible : plats vietnamiens/laotiens (bánh xèo, phở, bò bún, bún bò Huế, bánh mì, larb, khao piak), ostéo, PAO, UE, CC, TD, CM, Aurion, Thyvan. Réponds UNIQUEMENT par le texte transcrit." }], false, [{ inline_data: { mime_type: (b.mime || "audio/webm").split(";")[0], data: String(b.audio) } }]);
+        const t = await gemini([{ role: "system", content: "Transcris exactement cet audio en français, sans rien ajouter. Vocabulaire possible : plats vietnamiens/laotiens (bánh xèo, phở, bò bún, bún bò Huế, bánh mì, larb, khao piak), ostéo, PAO, UE, CC, TD, CM, Aurion, Thyvan. Réponds UNIQUEMENT par le texte transcrit." }], false, [{ inline_data: { mime_type: (b.mime || "audio/webm").split(";")[0], data: String(b.audio) } }], true);
         if (t.trim()) return J({ text: t.trim(), model: "gemini" });
       } catch (_e) { /* on tente Mistral */ }
       let last = "";
