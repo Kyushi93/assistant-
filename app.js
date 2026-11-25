@@ -858,14 +858,14 @@ async function sendChat(text) {
     aiHist.push({ role: "user", content: text }, { role: "assistant", content: r.reply || "" }); aiHist = aiHist.slice(-12);
     const show = () => { w.innerHTML = esc(r.reply || "…").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>"); $("ai-log").scrollTop = 1e9; };
     if (!voiceOn()) show();
-    const done = await runActions(r.actions);
-    if (done.length) chatAdd("act", done.join("<br>"));
+    // Les actions (ex. analyse d'un repas) tournent en parallèle : Jarvis parle tout de suite
+    runActions(r.actions).then(done => { if (done.length) chatAdd("act", done.join("<br>")); }).catch(() => {});
     if (voiceOn()) speak(r.reply || "", st => { if (convo && $("ai-sheet").classList.contains("on")) listen(st); else if (st) { try { st.getTracks().forEach(t => t.stop()); } catch (e) {} } }, { audio0: r.audio0, rest: r.rest, onStart: show });
   } catch (e) { w.innerHTML = aiErr(e); if (voiceOn()) speak(aiErr(e)); convo = false; setMic(""); }
 }
 (function () {
   const sh = document.createElement("div"); sh.className = "sheet"; sh.id = "ai-sheet";
-  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v22</small></h2><button class="btn sec" data-close>Fermer</button></div>
+  sh.innerHTML = `<div class="in aiin"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:22px">🤖 Jarvis <small class="muted" style="font-size:11px;font-family:inherit">v27</small></h2><button class="btn sec" data-close>Fermer</button></div>
     <div id="ai-log"><div class="msg bot">Bonjour boss. Touchez le micro et parlez-moi : planning, évals, révisions… ou dites-moi ce que vous avez mangé, bu ou révisé, je note tout.</div></div>
     <div class="chips" id="ai-chips">${["Je révise quoi ce soir ?", "J'ai cours où demain ?", "Comment s'est passée ma semaine ?", "Interroge-moi sur mon prochain CC"].map(s => `<button type="button">${s}</button>`).join("")}</div>
     <div class="micwrap"><button type="button" id="ai-mic" aria-label="Parler"><span>🎙️</span></button><div id="ai-mic-lbl" class="small muted">Touche pour parler</div><label class="jv"><input type="checkbox" id="ai-voice"> 🔊 Mode Jarvis (il te répond à voix haute et réécoute)</label><label class="jv"><input type="checkbox" id="ai-barge"> 🗣️ Je peux lui couper la parole en parlant</label><div class="row nowrap vsel"><select id="ai-vsel"></select><button type="button" class="btn sec" id="ai-vtest">▶︎ Écouter</button></div><label class="jv"><input type="checkbox" id="ai-manual"> 🖐️ C'est moi qui touche le micro quand j'ai fini de parler</label></div>
