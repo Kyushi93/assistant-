@@ -7,7 +7,7 @@ window.CC_DATA = [
  ["2026-11-18","UE 1.7","Anat. & physio SMS","CC1","QCM","18/11 ou 09/12 selon ton groupe"],
  ["2026-11-19","UE 2.3","Infectiologie","CC1","Mixte",""],
  ["2026-11-25","UE 5.6","PAO Lombo-pelvien","CC1","Oral","Mer. 25/11 : passage 11h26, convocation 11h11 · Groupe E (M. Pacaud) · binôme Justine Picard"],
- ["2026-11-27","UE 1.8","Anat. & physio cardio-respi","CC1","Mixte","27/11 ou 07/12 selon ton groupe"],
+ ["2026-11-27","UE 1.8","Anat. & physio cardio-respi","CC1","Mixte","Passage du 27/11 reporté à une date ultérieure (fermeture de l'ESO) ; 07/12 pour l'autre groupe","Reporté (nouvelle date à venir)"],
  ["2026-12-01","UE 1.4","Biophysique & biomécanique","CC1 (exposé)","Oral",""],
  ["2026-12-04","UE 1.9","Digestif, endocrino & génito-urinaire","CC1","Mixte",""],
  ["2026-12-09","UE 1.7","Anat. & physio SMS","CC1 (2e passage)","QCM","Seulement si tu n'es pas passé le 18/11"],
