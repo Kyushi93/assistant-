@@ -38,5 +38,21 @@
   "title": "PAO : support du CM du lundi 23/11 sur Classroom",
   "body": "Clément Gren a mis en ligne le CM de PAO (Domaine 5) du 23/11 : récupère-le sur Classroom pour tes révisions.",
   "source": "Mail de Clément Gren (Classroom)"
+ },
+ {
+  "id": "1a2195b543b5c084",
+  "date": "2026-11-26",
+  "type": "info",
+  "title": "ESO fermée ce vendredi 27/11 (coupure d'eau)",
+  "body": "Cours théoriques maintenus en visio, cours de pratique reportés (nouvelles dates à venir), clinique fermée toute la journée.",
+  "source": "Mail de Romain Lecoq"
+ },
+ {
+  "id": "1a219e8844bcf02c",
+  "date": "2026-11-26",
+  "type": "cancel",
+  "title": "CC de l'UE 1.8 du 27/11 reporté",
+  "body": "Pratique et clinique du matin annulées ; les cours de 1.8 et 1.9 de l'après-midi ont lieu en visio (lien dans Google Agenda). Le CC de 1.8 est reporté à une date ultérieure.",
+  "source": "Mail de Ludovic Sausse"
  }
 ]
