@@ -1,5 +1,5 @@
 // Service worker : mode hors-ligne + notifications push
-const CACHE = "assistant-v29";
+const CACHE = "assistant-v30";
 const SHELL = ["./", "index.html", "app.js", "config.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
